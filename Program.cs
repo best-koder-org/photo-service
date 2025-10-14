@@ -1,10 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PhotoService.Data;
+using PhotoService.Extensions;
 using PhotoService.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Security.Cryptography;
-using System.Text;
 using SixLabors.ImageSharp.Web.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -84,27 +81,7 @@ builder.Services.AddDbContext<PhotoContext>(options =>
     }));
 
 // JWT Authentication - RSA Public Key Configuration to match AuthService
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    // Use demo configuration (can be enhanced later for production)
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = "DatingApp-Issuer",
-        ValidAudience = "DatingApp-Audience",
-        IssuerSigningKey = GetPublicKey()
-    };
-});
-
-// Authorization
+builder.Services.AddKeycloakAuthentication(builder.Configuration);
 builder.Services.AddAuthorization();
 
 // ImageSharp Configuration - Industry standard image processing
@@ -210,36 +187,3 @@ if (!string.IsNullOrEmpty(urls))
 
 app.Run();
 
-// ================================
-// RSA KEY MANAGEMENT
-// Public key validation for JWT tokens from AuthService
-// ================================
-
-static RsaSecurityKey GetPublicKey()
-{
-    try
-    {
-        var publicKeyPath = "public.key";
-        if (File.Exists(publicKeyPath))
-        {
-            var publicKeyPem = File.ReadAllText(publicKeyPath);
-            var rsa = RSA.Create();
-            rsa.ImportFromPem(publicKeyPem);
-            return new RsaSecurityKey(rsa);
-        }
-        else
-        {
-            // For demo mode or when no key file exists, create a temporary key
-            // In production, this should always use the proper public key
-            var rsa = RSA.Create(2048);
-            return new RsaSecurityKey(rsa);
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error loading public key: {ex.Message}");
-        // Fallback to temporary key
-        var rsa = RSA.Create(2048);
-        return new RsaSecurityKey(rsa);
-    }
-}

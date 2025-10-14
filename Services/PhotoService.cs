@@ -128,13 +128,20 @@ public class PhotoService : IPhotoService
                 }
             }
 
+            var storedFileName = fullSizeStorage.FileName;
+
             // Store thumbnail
             using (var thumbStream = new MemoryStream(processedImage.ThumbnailData))
             {
-                thumbnailStorage = await _storage.StoreImageAsync(thumbStream, userId, uploadDto.Photo.FileName, "_thumb");
+                var thumbnailFileName = GetThumbnailFileName(storedFileName);
+                thumbnailStorage = await _storage.StoreImageAsync(
+                    thumbStream,
+                    userId,
+                    thumbnailFileName,
+                    useProvidedFileName: true);
+
                 if (!thumbnailStorage.Success)
                 {
-                    // Cleanup full-size image on thumbnail failure
                     await _storage.DeleteImageAsync(fullSizeStorage.FilePath);
                     result.ErrorMessage = $"Failed to store thumbnail: {thumbnailStorage.ErrorMessage}";
                     return result;
@@ -144,10 +151,15 @@ public class PhotoService : IPhotoService
             // Store medium-size image
             using (var mediumStream = new MemoryStream(processedImage.MediumData))
             {
-                mediumStorage = await _storage.StoreImageAsync(mediumStream, userId, uploadDto.Photo.FileName, "_medium");
+                var mediumFileName = GetMediumFileName(storedFileName);
+                mediumStorage = await _storage.StoreImageAsync(
+                    mediumStream,
+                    userId,
+                    mediumFileName,
+                    useProvidedFileName: true);
+
                 if (!mediumStorage.Success)
                 {
-                    // Cleanup previously stored images on medium failure
                     await _storage.DeleteImageAsync(fullSizeStorage.FilePath);
                     await _storage.DeleteImageAsync(thumbnailStorage.FilePath);
                     result.ErrorMessage = $"Failed to store medium image: {mediumStorage.ErrorMessage}";
@@ -451,12 +463,21 @@ public class PhotoService : IPhotoService
         if (photo == null)
             return (null, string.Empty, string.Empty);
 
-        string filePath = size.ToLower() switch
+        var normalizedSize = (size ?? "full").Trim().ToLowerInvariant();
+        var storedFileNameWithoutExtension = Path.GetFileNameWithoutExtension(photo.StoredFileName);
+        var storedFileExtension = Path.GetExtension(photo.StoredFileName);
+
+        var targetFileName = normalizedSize switch
         {
-            "thumbnail" => photo.FilePath.Replace(photo.StoredFileName, photo.StoredFileName.Replace(".", "_thumb.")),
-            "medium" => photo.FilePath.Replace(photo.StoredFileName, photo.StoredFileName.Replace(".", "_medium.")),
-            _ => photo.FilePath
+            "thumbnail" => $"{storedFileNameWithoutExtension}_thumb{storedFileExtension}",
+            "medium" => $"{storedFileNameWithoutExtension}_medium{storedFileExtension}",
+            _ => photo.StoredFileName
         };
+
+        var relativePath = Path.Combine(photo.UserId.ToString(), targetFileName)
+            .Replace(Path.DirectorySeparatorChar, '/');
+
+        var filePath = relativePath;
 
         var stream = await _storage.GetImageStreamAsync(filePath);
         var contentType = GetContentType(photo.FileExtension);
@@ -703,7 +724,11 @@ public class PhotoService : IPhotoService
 
             // Store files
             using var imageStream = new MemoryStream(privacyProcessing.StandardProcessingResult.ImageData);
-            var storageResult = await _storage.StoreImageAsync(imageStream, userId, photo.StoredFileName);
+            var storageResult = await _storage.StoreImageAsync(
+                imageStream,
+                userId,
+                photo.StoredFileName,
+                useProvidedFileName: true);
             
             if (!storageResult.Success)
             {
@@ -944,7 +969,11 @@ public class PhotoService : IPhotoService
             {
                 var thumbName = GetThumbnailFileName(baseFileName);
                 using var thumbStream = new MemoryStream(processing.ThumbnailData);
-                await _storage.StoreImageAsync(thumbStream, userId, thumbName, "_thumb");
+                await _storage.StoreImageAsync(
+                    thumbStream,
+                    userId,
+                    thumbName,
+                    useProvidedFileName: true);
             }
 
             // Store medium size
@@ -952,7 +981,11 @@ public class PhotoService : IPhotoService
             {
                 var mediumName = GetMediumFileName(baseFileName);
                 using var mediumStream = new MemoryStream(processing.MediumData);
-                await _storage.StoreImageAsync(mediumStream, userId, mediumName, "_medium");
+                await _storage.StoreImageAsync(
+                    mediumStream,
+                    userId,
+                    mediumName,
+                    useProvidedFileName: true);
             }
         }
         catch (Exception ex)

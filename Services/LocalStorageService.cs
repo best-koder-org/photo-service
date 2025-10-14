@@ -33,7 +33,12 @@ public class LocalStorageService : IStorageService
     /// Store image file with unique naming and directory organization
     /// Creates user-specific directories and handles naming conflicts
     /// </summary>
-    public async Task<StorageResult> StoreImageAsync(Stream stream, int userId, string originalFileName, string suffix = "")
+    public async Task<StorageResult> StoreImageAsync(
+        Stream stream,
+        int userId,
+        string originalFileName,
+        string suffix = "",
+        bool useProvidedFileName = false)
     {
         var result = new StorageResult();
 
@@ -54,16 +59,27 @@ public class LocalStorageService : IStorageService
 
             var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
             var baseFileName = Path.GetFileNameWithoutExtension(originalFileName);
-            
-            // Sanitize filename to remove invalid characters
+
+            // Sanitize filename to remove invalid characters while preserving underscores
             baseFileName = SanitizeFileName(baseFileName);
-            
-            // Generate unique filename with timestamp and GUID
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-            var uniqueId = Guid.NewGuid().ToString("N")[..8]; // First 8 chars of GUID
-            
-            var fileName = $"{userId}_{timestamp}_{uniqueId}{suffix}{extension}";
-            var filePath = Path.Combine(userDirectory, fileName);
+
+            string fileName;
+            string filePath;
+
+            if (useProvidedFileName)
+            {
+                fileName = string.IsNullOrWhiteSpace(baseFileName)
+                    ? $"image{extension}"
+                    : $"{baseFileName}{extension}";
+                filePath = Path.Combine(userDirectory, fileName);
+            }
+            else
+            {
+                var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+                var uniqueId = Guid.NewGuid().ToString("N")[..8];
+                fileName = $"{userId}_{timestamp}_{uniqueId}{suffix}{extension}";
+                filePath = Path.Combine(userDirectory, fileName);
+            }
 
             // ================================
             // CONFLICT RESOLUTION
@@ -71,11 +87,11 @@ public class LocalStorageService : IStorageService
             // ================================
 
             int counter = 1;
-            var originalFilePath = filePath;
+            var baseNameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
             while (File.Exists(filePath))
             {
-                var fileNameWithoutExt = Path.GetFileNameWithoutExtension(originalFilePath);
-                fileName = $"{fileNameWithoutExt}_{counter}{extension}";
+                var candidateBase = $"{baseNameWithoutExt}_{counter}";
+                fileName = $"{candidateBase}{extension}";
                 filePath = Path.Combine(userDirectory, fileName);
                 counter++;
 

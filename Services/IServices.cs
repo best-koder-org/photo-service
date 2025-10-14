@@ -290,8 +290,14 @@ public interface IStorageService
     /// <param name="userId">User identifier for directory organization</param>
     /// <param name="originalFileName">Original file name</param>
     /// <param name="suffix">Optional suffix for different sizes (thumbnail, medium)</param>
+    /// <param name="useProvidedFileName">When true, preserves the provided filename (after sanitization)</param>
     /// <returns>Storage result with file path and metadata</returns>
-    Task<StorageResult> StoreImageAsync(Stream stream, int userId, string originalFileName, string suffix = "");
+    Task<StorageResult> StoreImageAsync(
+        Stream stream,
+        int userId,
+        string originalFileName,
+        string suffix = "",
+        bool useProvidedFileName = false);
 
     /// <summary>
     /// Retrieve image file stream
