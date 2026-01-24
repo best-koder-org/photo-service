@@ -1,3 +1,5 @@
+using DatingApp.Shared.Middleware;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using PhotoService.Data;
 using PhotoService.Extensions;
@@ -5,6 +7,12 @@ using PhotoService.Services;
 using SixLabors.ImageSharp.Web.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+});
 
 // ================================
 // PHOTO SERVICE CONFIGURATION
@@ -93,8 +101,15 @@ builder.Services.AddScoped<IPhotoService, PhotoService.Services.PhotoService>();
 builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
 builder.Services.AddScoped<IStorageService, LocalStorageService>();
 
+// Add MediatR for CQRS
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+
+// Add FluentValidation
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+
 // HTTP Context for URL generation
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddCorrelationIds();
 
 // CORS Configuration - For cross-origin requests
 builder.Services.AddCors(options =>
@@ -151,6 +166,7 @@ app.Use(async (context, next) =>
 // Standard middleware pipeline
 app.UseCors("AllowAll");
 app.UseHttpsRedirection();
+app.UseCorrelationIds();
 app.UseAuthentication();
 app.UseAuthorization();
 
