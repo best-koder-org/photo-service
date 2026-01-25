@@ -788,12 +788,13 @@ public class PhotoService : IPhotoService
                 photo.FileSizeBytes / (1024.0 * 1024.0));
 
             return result;
-        }// T027: Error telemetry for photo upload failures
-            _logger.LogError(ex, "[PhotoUpload] ERROR - UserId: {UserId}, FileName: {FileName}, ErrorMessage: {ErrorMessage}",
-                userId, uploadDto.Photo.FileName, ex.Message
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading privacy photo for user {UserId}", userId);
+            // T027: Error telemetry for photo upload failures
+            _logger.LogError(ex, "[PhotoUpload] ERROR - UserId: {UserId}, FileName: {FileName}, ErrorMessage: {ErrorMessage}",
+                userId, uploadDto.Photo.FileName, ex.Message);
+            
             stopwatch.Stop();
             result.ProcessingTimeMs = (int)stopwatch.ElapsedMilliseconds;
             result.ErrorMessage = "An error occurred during photo upload";
