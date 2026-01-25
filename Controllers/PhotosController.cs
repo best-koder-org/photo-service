@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PhotoService.Data;
 using PhotoService.DTOs;
 using PhotoService.Services;
 using PhotoService.Models;
@@ -20,15 +22,23 @@ public class PhotosController : ControllerBase
 {
     private readonly IPhotoService _photoService;
     private readonly ILogger<PhotosController> _logger;
+    private readonly ISafetyServiceClient _safetyService;
+    private readonly PhotoContext _context;
 
     /// <summary>
     /// Constructor with dependency injection
     /// Standard controller pattern with service layer integration
     /// </summary>
-    public PhotosController(IPhotoService photoService, ILogger<PhotosController> logger)
+    public PhotosController(
+        IPhotoService photoService, 
+        ILogger<PhotosController> logger,
+        ISafetyServiceClient safetyService,
+        PhotoContext context)
     {
         _photoService = photoService;
         _logger = logger;
+        _safetyService = safetyService;
+        _context = context;
     }
 
     /// <summary>
@@ -215,19 +225,69 @@ public class PhotosController : ControllerBase
     /// Serve photo image file
     /// GET /api/photos/{id}/image?size={size}
     /// Returns image file with appropriate content type and caching headers
+    /// Enforces privacy: blocked users cannot access each other's photos
     /// </summary>
     /// <param name="id">Photo identifier</param>
     /// <param name="size">Image size (full, medium, thumbnail)</param>
     /// <returns>Image file stream</returns>
     [HttpGet("{id:int}/image")]
-    [AllowAnonymous] // Allow anonymous access for public photo viewing
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetPhotoImage(int id, [FromQuery] string size = "full")
     {
         try
         {
+            // ================================
+            // SAFETY CHECK: Block photo access between blocked users
+            // If user is authenticated, check block status
+            // ================================
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                try
+                {
+                    var requestingUserId = GetCurrentUserId();
+                    
+                    // Get photo owner from database
+                    var photo = await _context.Photos
+                        .Where(p => p.Id == id && !p.IsDeleted)
+                        .Select(p => new { p.UserId })
+                        .FirstOrDefaultAsync();
+
+                    if (photo == null)
+                    {
+                        return NotFound("Photo not found");
+                    }
+
+                    // Don't check blocks if viewing own photo
+                    if (photo.UserId != requestingUserId)
+                    {
+                        var photoOwnerId = photo.UserId.ToString();
+                        var requesterId = requestingUserId.ToString();
+
+                        // Check bidirectional block status
+                        var isBlocked = await _safetyService.IsBlockedAsync(requesterId, photoOwnerId) ||
+                                       await _safetyService.IsBlockedAsync(photoOwnerId, requesterId);
+
+                        if (isBlocked)
+                        {
+                            _logger.LogWarning("User {RequesterId} attempted to access photo {PhotoId} owned by blocked user {PhotoOwnerId}", 
+                                requesterId, id, photoOwnerId);
+                            return StatusCode(StatusCodes.Status403Forbidden, "Access denied");
+                        }
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // If user ID cannot be determined, allow access (anonymous view)
+                    _logger.LogDebug("Unable to determine user ID for safety check, allowing anonymous access to photo {PhotoId}", id);
+                }
+            }
+
+            // ================================
+            // SERVE IMAGE
+            // ================================
             var (stream, contentType, fileName) = await _photoService.GetPhotoStreamAsync(id, size);
 
             if (stream == null)
