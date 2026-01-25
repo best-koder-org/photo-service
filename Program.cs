@@ -126,6 +126,12 @@ builder.Services.AddCors(options =>
 // HTTP Client for external service communication
 builder.Services.AddHttpClient();
 
+// Safety Service Client for blocking checks
+builder.Services.AddHttpClient<ISafetyServiceClient, SafetyServiceClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Gateway:BaseUrl"] ?? "http://dejting-yarp:8080");
+});
+
 var app = builder.Build();
 
 // ================================
