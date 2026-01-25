@@ -720,6 +720,14 @@ public class PhotoService : IPhotoService
             if (privacyProcessing.ModerationAnalysis != null)
             {
                 photo.SetModerationResults(privacyProcessing.ModerationAnalysis);
+                
+                // T027: Audit log for content moderation decisions
+                _logger.LogInformation("[PhotoModeration] Photo moderated - PhotoId: (pending), UserId: {UserId}, SafetyScore: {SafetyScore:F2}, Status: {Status}, PrivacyLevel: {PrivacyLevel}, Issues: [{Issues}]",
+                    userId, 
+                    privacyProcessing.ModerationAnalysis.SafetyScore,
+                    photo.ModerationStatus,
+                    uploadDto.PrivacyLevel,
+                    string.Join(", ", privacyProcessing.ModerationAnalysis.DetectedIssues));
             }
 
             // Store files
@@ -773,11 +781,16 @@ public class PhotoService : IPhotoService
             result.PrivacyProcessing = MapToPrivacyProcessingDetailsDto(privacyProcessing, uploadDto.PrivacyLevel);
             result.ModerationAnalysis = MapToModerationAnalysisDto(privacyProcessing.ModerationAnalysis);
 
-            _logger.LogInformation("Privacy photo upload completed for user {UserId}, photo {PhotoId} in {ProcessingTime}ms", 
-                userId, photo.Id, result.ProcessingTimeMs);
+            // T027: Telemetry for photo upload success with performance metrics
+            _logger.LogInformation("[PhotoUpload] \u2713 Photo uploaded successfully - UserId: {UserId}, PhotoId: {PhotoId}, ProcessingTime: {ProcessingTime}ms, QualityScore: {QualityScore}, PrivacyLevel: {PrivacyLevel}, BlurGenerated: {BlurGenerated}, FileSize: {FileSizeMB:F2}MB",
+                userId, photo.Id, result.ProcessingTimeMs, photo.QualityScore, photo.PrivacyLevel, 
+                !string.IsNullOrEmpty(photo.BlurredFileName),
+                photo.FileSizeBytes / (1024.0 * 1024.0));
 
             return result;
-        }
+        }// T027: Error telemetry for photo upload failures
+            _logger.LogError(ex, "[PhotoUpload] ERROR - UserId: {UserId}, FileName: {FileName}, ErrorMessage: {ErrorMessage}",
+                userId, uploadDto.Photo.FileName, ex.Message
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error uploading privacy photo for user {UserId}", userId);
