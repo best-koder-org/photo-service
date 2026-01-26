@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PhotoService.Models;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using System.Text.Json;
 
 namespace PhotoService.Data;
 
 /// <summary>
-/// PostgreSQL-optimized Entity Framework context for photo management
-/// Designed specifically for PostgreSQL with PostGIS support and modern .NET 8 patterns
+/// MySQL-optimized Entity Framework context for photo management
+/// Designed for MySQL 8.0 with modern .NET 8 patterns
 /// </summary>
 public class PhotoContext : DbContext
 {
@@ -23,11 +24,17 @@ public class PhotoContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure PostgreSQL-specific settings
+        // Configure MySQL-specific settings
         ConfigurePhotoEntity(modelBuilder);
         ConfigurePhotoProcessingJobEntity(modelBuilder);
         ConfigurePhotoModerationLogEntity(modelBuilder);
     }
+
+    // Shared JSON converter for JsonDocument properties
+    private static readonly ValueConverter<JsonDocument?, string?> JsonDocumentToStringConverter =
+        new ValueConverter<JsonDocument?, string?>(
+            v => v == null ? null : v.RootElement.GetRawText(),
+            v => v == null ? null : JsonDocument.Parse(v, default));
 
     private void ConfigurePhotoEntity(ModelBuilder modelBuilder)
     {
@@ -39,8 +46,7 @@ public class PhotoContext : DbContext
         // Primary key
         photoEntity.HasKey(p => p.Id);
         photoEntity.Property(p => p.Id)
-            .HasColumnName("id")
-            .UseIdentityByDefaultColumn(); // PostgreSQL IDENTITY column
+            .HasColumnName("id"); // MySQL auto-increment for primary keys
 
         // User reference
         photoEntity.Property(p => p.UserId)
@@ -129,15 +135,22 @@ public class PhotoContext : DbContext
             .HasDefaultValue(100)
             .IsRequired();
 
-        // PostgreSQL JSON column for flexible metadata
+        // MySQL JSON column for flexible metadata
         photoEntity.Property(p => p.Metadata)
             .HasColumnName("metadata")
-            .HasColumnType("jsonb"); // PostgreSQL JSONB for performance
+            .HasColumnType("json")
+            .HasConversion(JsonDocumentToStringConverter);
 
-        // PostgreSQL array for tags
+        // Moderation results as JSON
+        photoEntity.Property(p => p.ModerationResults)
+            .HasColumnName("moderation_results")
+            .HasColumnType("json")
+            .HasConversion(JsonDocumentToStringConverter);
+
+        // Tags as JSON array (MySQL doesn't support native arrays)
         photoEntity.Property(p => p.Tags)
             .HasColumnName("tags")
-            .HasColumnType("text[]"); // PostgreSQL array
+            .HasColumnType("json"); // MySQL JSON array
 
         // Hash for duplicate detection
         photoEntity.Property(p => p.ContentHash)
@@ -160,15 +173,13 @@ public class PhotoContext : DbContext
         photoEntity.HasIndex(p => p.ModerationStatus)
             .HasDatabaseName("ix_photos_moderation_status");
 
-        // PostgreSQL GIN index for JSONB metadata
+        // Index for JSONB metadata (standard index for MySQL)
         photoEntity.HasIndex(p => p.Metadata)
-            .HasDatabaseName("ix_photos_metadata_gin")
-            .HasMethod("gin");
+            .HasDatabaseName("ix_photos_metadata");
 
-        // PostgreSQL GIN index for text array tags
+        // Index for tags (standard index for MySQL)
         photoEntity.HasIndex(p => p.Tags)
-            .HasDatabaseName("ix_photos_tags_gin")
-            .HasMethod("gin");
+            .HasDatabaseName("ix_photos_tags");
 
         // Constraints
         photoEntity.HasCheckConstraint("ck_photos_quality_score_range", 
@@ -189,8 +200,7 @@ public class PhotoContext : DbContext
 
         jobEntity.HasKey(j => j.Id);
         jobEntity.Property(j => j.Id)
-            .HasColumnName("id")
-            .UseIdentityByDefaultColumn();
+            .HasColumnName("id"); // MySQL auto-increment
 
         jobEntity.Property(j => j.PhotoId)
             .HasColumnName("photo_id")
@@ -209,11 +219,13 @@ public class PhotoContext : DbContext
 
         jobEntity.Property(j => j.Parameters)
             .HasColumnName("parameters")
-            .HasColumnType("jsonb");
+            .HasColumnType("json")
+            .HasConversion(JsonDocumentToStringConverter);
 
         jobEntity.Property(j => j.Result)
             .HasColumnName("result")
-            .HasColumnType("jsonb");
+            .HasColumnType("json")
+            .HasConversion(JsonDocumentToStringConverter);
 
         jobEntity.Property(j => j.ErrorMessage)
             .HasColumnName("error_message")
@@ -259,8 +271,7 @@ public class PhotoContext : DbContext
 
         logEntity.HasKey(l => l.Id);
         logEntity.Property(l => l.Id)
-            .HasColumnName("id")
-            .UseIdentityByDefaultColumn();
+            .HasColumnName("id"); // MySQL auto-increment
 
         logEntity.Property(l => l.PhotoId)
             .HasColumnName("photo_id")

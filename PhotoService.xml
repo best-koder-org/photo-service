@@ -250,8 +250,8 @@
         </member>
         <member name="T:PhotoService.Data.PhotoContext">
             <summary>
-            PostgreSQL-optimized Entity Framework context for photo management
-            Designed specifically for PostgreSQL with PostGIS support and modern .NET 8 patterns
+            MySQL-optimized Entity Framework context for photo management
+            Designed for MySQL 8.0 with modern .NET 8 patterns
             </summary>
         </member>
         <member name="M:PhotoService.Data.PhotoContext.SaveChanges">
@@ -816,30 +816,6 @@
             <summary>
             Error message if regeneration failed
             </summary>
-        </member>
-        <member name="T:PhotoService.Migrations.InitialPostgreSQLSchema">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.InitialPostgreSQLSchema.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.InitialPostgreSQLSchema.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.InitialPostgreSQLSchema.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="T:PhotoService.Migrations.AddPrivacyFeatures">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.AddPrivacyFeatures.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.AddPrivacyFeatures.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.AddPrivacyFeatures.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
-            <inheritdoc />
         </member>
         <member name="T:PhotoService.Models.Photo">
             <summary>

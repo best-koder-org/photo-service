@@ -72,20 +72,19 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Database Configuration - PostgreSQL for all environments (superior for dating apps)
+// Database Configuration - MySQL for consistency across all services
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? 
                       Environment.GetEnvironmentVariable("DATABASE_URL") ??
-                      "Host=localhost;Database=photos_db;Username=postgres;Password=postgres";
+                      "Server=localhost;Port=3311;Database=PhotoServiceDb;User=photoservice_user;Password=photoservice_user_password;";
 
+var serverVersion = new MySqlServerVersion(new Version(8, 0, 32));
 builder.Services.AddDbContext<PhotoContext>(options =>
-    options.UseNpgsql(connectionString, npgsqlOptions =>
+    options.UseMySql(connectionString, serverVersion, mySqlOptions =>
     {
-        npgsqlOptions.EnableRetryOnFailure(
+        mySqlOptions.EnableRetryOnFailure(
             maxRetryCount: 3,
             maxRetryDelay: TimeSpan.FromSeconds(5),
-            errorCodesToAdd: null);
-        // Enable PostGIS for geospatial queries (useful for location-based features)
-        npgsqlOptions.UseNetTopologySuite();
+            errorNumbersToAdd: null);
     }));
 
 // JWT Authentication - RSA Public Key Configuration to match AuthService
