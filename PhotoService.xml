@@ -19,6 +19,11 @@
             Result pattern for operations without return value
             </summary>
         </member>
+        <member name="M:PhotoService.Controllers.PhotoDeletionController.DeleteUserPhotos(System.Int32)">
+            <summary>
+            Cascade delete all photos for a user (called during account deletion)
+            </summary>
+        </member>
         <member name="T:PhotoService.Controllers.PhotosController">
             <summary>
             Photo Controller - RESTful API for photo management operations
@@ -26,7 +31,7 @@
             Standard REST conventions with comprehensive error handling
             </summary>
         </member>
-        <member name="M:PhotoService.Controllers.PhotosController.#ctor(PhotoService.Services.IPhotoService,Microsoft.Extensions.Logging.ILogger{PhotoService.Controllers.PhotosController})">
+        <member name="M:PhotoService.Controllers.PhotosController.#ctor(PhotoService.Services.IPhotoService,Microsoft.Extensions.Logging.ILogger{PhotoService.Controllers.PhotosController},PhotoService.Services.ISafetyServiceClient,PhotoService.Services.IMatchmakingServiceClient,PhotoService.Data.PhotoContext)">
             <summary>
             Constructor with dependency injection
             Standard controller pattern with service layer integration
@@ -71,6 +76,8 @@
             Serve photo image file
             GET /api/photos/{id}/image?size={size}
             Returns image file with appropriate content type and caching headers
+            Enforces privacy: blocked users cannot access each other's photos
+            MMP Privacy: Non-matched users receive blurred version
             </summary>
             <param name="id">Photo identifier</param>
             <param name="size">Image size (full, medium, thumbnail)</param>
@@ -215,6 +222,15 @@
             <param name="id">Photo identifier</param>
             <param name="blurIntensity">New blur intensity (0.0 to 1.0)</param>
             <returns>Processing result</returns>
+        </member>
+        <member name="M:PhotoService.Controllers.PhotosController.DeleteUserPhotos(System.Int32)">
+            <summary>
+            Delete all photos for a specific user
+            DELETE /api/photos/user/{userProfileId}
+            Used during account deletion to remove all user photos
+            </summary>
+            <param name="userProfileId">User profile ID whose photos should be deleted</param>
+            <returns>Number of photos deleted</returns>
         </member>
         <member name="T:PhotoService.Controllers.ModerationUpdateRequest">
             <summary>

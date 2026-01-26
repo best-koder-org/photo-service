@@ -23,6 +23,7 @@ public class PhotosController : ControllerBase
     private readonly IPhotoService _photoService;
     private readonly ILogger<PhotosController> _logger;
     private readonly ISafetyServiceClient _safetyService;
+    private readonly IMatchmakingServiceClient _matchmakingService;
     private readonly PhotoContext _context;
 
     /// <summary>
@@ -33,11 +34,13 @@ public class PhotosController : ControllerBase
         IPhotoService photoService, 
         ILogger<PhotosController> logger,
         ISafetyServiceClient safetyService,
+        IMatchmakingServiceClient matchmakingService,
         PhotoContext context)
     {
         _photoService = photoService;
         _logger = logger;
         _safetyService = safetyService;
+        _matchmakingService = matchmakingService;
         _context = context;
     }
 
@@ -226,6 +229,7 @@ public class PhotosController : ControllerBase
     /// GET /api/photos/{id}/image?size={size}
     /// Returns image file with appropriate content type and caching headers
     /// Enforces privacy: blocked users cannot access each other's photos
+    /// MMP Privacy: Non-matched users receive blurred version
     /// </summary>
     /// <param name="id">Photo identifier</param>
     /// <param name="size">Image size (full, medium, thumbnail)</param>
@@ -239,36 +243,44 @@ public class PhotosController : ControllerBase
     {
         try
         {
+            // Get photo owner from database
+            var photo = await _context.Photos
+                .Where(p => p.Id == id && !p.IsDeleted)
+                .Select(p => new { p.UserId })
+                .FirstOrDefaultAsync();
+
+            if (photo == null)
+            {
+                return NotFound("Photo not found");
+            }
+
             // ================================
-            // SAFETY CHECK: Block photo access between blocked users
-            // If user is authenticated, check block status
+            // PRIVACY ENFORCEMENT (T052 - MMP Requirement)
+            // 1. Block check (existing)
+            // 2. Match verification (NEW)
+            // 3. Serve blurred version if not matched
             // ================================
+            
+            bool serveBlurred = false;
+            
             if (User.Identity?.IsAuthenticated == true)
             {
                 try
                 {
                     var requestingUserId = GetCurrentUserId();
-                    
-                    // Get photo owner from database
-                    var photo = await _context.Photos
-                        .Where(p => p.Id == id && !p.IsDeleted)
-                        .Select(p => new { p.UserId })
-                        .FirstOrDefaultAsync();
+                    var photoOwnerId = photo.UserId;
 
-                    if (photo == null)
+                    // Allow users to view their own photos
+                    if (photoOwnerId != requestingUserId)
                     {
-                        return NotFound("Photo not found");
-                    }
-
-                    // Don't check blocks if viewing own photo
-                    if (photo.UserId != requestingUserId)
-                    {
-                        var photoOwnerId = photo.UserId.ToString();
                         var requesterId = requestingUserId.ToString();
+                        var ownerId = photoOwnerId.ToString();
 
-                        // Check bidirectional block status
-                        var isBlocked = await _safetyService.IsBlockedAsync(requesterId, photoOwnerId) ||
-                                       await _safetyService.IsBlockedAsync(photoOwnerId, requesterId);
+                        // ================================
+                        // SAFETY CHECK: Block status
+                        // ================================
+                        var isBlocked = await _safetyService.IsBlockedAsync(requesterId, ownerId) ||
+                                       await _safetyService.IsBlockedAsync(ownerId, requesterId);
 
                         if (isBlocked)
                         {
@@ -276,42 +288,93 @@ public class PhotosController : ControllerBase
                                 requesterId, id, photoOwnerId);
                             return StatusCode(StatusCodes.Status403Forbidden, "Access denied");
                         }
+
+                        // ================================
+                        // PRIVACY CHECK: Match verification (T052)
+                        // If users are not matched, serve blurred version
+                        // ================================
+                        var areMatched = await _matchmakingService.AreUsersMatchedAsync(requesterId, ownerId);
+                        
+                        if (!areMatched)
+                        {
+                            _logger.LogInformation("User {RequesterId} requested photo {PhotoId} from non-matched user {PhotoOwnerId} - serving blurred version", 
+                                requesterId, id, photoOwnerId);
+                            serveBlurred = true;
+                        }
                     }
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    // If user ID cannot be determined, allow access (anonymous view)
-                    _logger.LogDebug("Unable to determine user ID for safety check, allowing anonymous access to photo {PhotoId}", id);
+                    // If user ID cannot be determined, serve blurred (fail secure)
+                    _logger.LogDebug("Unable to determine user ID for privacy check, serving blurred version of photo {PhotoId}", id);
+                    serveBlurred = true;
                 }
+            }
+            else
+            {
+                // Unauthenticated users get blurred version (fail secure)
+                _logger.LogDebug("Unauthenticated access to photo {PhotoId}, serving blurred version", id);
+                serveBlurred = true;
             }
 
             // ================================
-            // SERVE IMAGE
+            // SERVE IMAGE (original or blurred)
             // ================================
-            var (stream, contentType, fileName) = await _photoService.GetPhotoStreamAsync(id, size);
-
-            if (stream == null)
+            Stream stream;
+            string contentType;
+            string fileName;
+            
+            if (serveBlurred)
             {
-                return NotFound("Photo not found");
+                // Serve blurred version
+                var blurResult = await _photoService.GetBlurredPhotoAsync(id);
+                
+                if (blurResult.ImageData == null)
+                {
+                    // If blurred version doesn't exist, generate it on-the-fly
+                    _logger.LogWarning("Blurred version not found for photo {PhotoId}, generating...", id);
+                    var (origStream, _, _) = await _photoService.GetPhotoStreamAsync(id, size);
+                    if (origStream == null)
+                    {
+                        return NotFound("Photo not found");
+                    }
+                    // For MVP, return 404 if blur doesn't exist (photos should have blur generated on upload)
+                    origStream.Dispose();
+                    return NotFound("Blurred version not available");
+                }
+                
+                stream = new MemoryStream(blurResult.ImageData);
+                contentType = blurResult.ContentType;
+                fileName = blurResult.FileName;
+            }
+            else
+            {
+                // Serve original version
+                (stream, contentType, fileName) = await _photoService.GetPhotoStreamAsync(id, size);
+                
+                if (stream == null)
+                {
+                    return NotFound("Photo not found");
+                }
             }
 
             // ================================
             // CACHING HEADERS
             // Optimize image delivery with browser caching
             // ================================
-
             Response.Headers.CacheControl = "public, max-age=3600"; // Cache for 1 hour
-            Response.Headers.ETag = $"\"{id}_{size}\"";
+            Response.Headers.ETag = $"\"{id}_{size}_{(serveBlurred ? "blurred" : "original")}\"";
             
             // Check if client has cached version
             var etag = Request.Headers.IfNoneMatch.FirstOrDefault();
-            if (etag == $"\"{id}_{size}\"")
+            if (etag == $"\"{id}_{size}_{(serveBlurred ? "blurred" : "original")}\"")
             {
                 stream.Dispose();
                 return StatusCode(StatusCodes.Status304NotModified);
             }
 
-            _logger.LogDebug("Serving photo {PhotoId} ({Size}) to client", id, size);
+            _logger.LogDebug("Serving {Version} photo {PhotoId} ({Size}) to client", 
+                serveBlurred ? "blurred" : "original", id, size);
 
             return File(stream, contentType, fileName, enableRangeProcessing: true);
         }
@@ -928,6 +991,71 @@ public class PhotosController : ControllerBase
         {
             _logger.LogError(ex, "Error regenerating blur for photo {PhotoId} by user {UserId}", id, GetCurrentUserId());
             return StatusCode(500, "An error occurred while regenerating the blurred image");
+        }
+    }
+
+    /// <summary>
+    /// Delete all photos for a specific user
+    /// DELETE /api/photos/user/{userProfileId}
+    /// Used during account deletion to remove all user photos
+    /// </summary>
+    /// <param name="userProfileId">User profile ID whose photos should be deleted</param>
+    /// <returns>Number of photos deleted</returns>
+    [HttpDelete("user/{userProfileId:int}")]
+    [AllowAnonymous] // Called by UserService during account deletion
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteUserPhotos(int userProfileId)
+    {
+        try
+        {
+            _logger.LogInformation("Deleting all photos for user {UserProfileId}", userProfileId);
+
+            // Note: Photo.UserId field actually stores the UserProfile.Id, not Keycloak UserId
+            var photos = await _context.Photos
+                .Where(p => p.UserId == userProfileId)
+                .ToListAsync();
+
+            var count = photos.Count;
+
+            // Delete photo files from disk
+            foreach (var photo in photos)
+            {
+                try
+                {
+                    var filePath = Path.Combine("uploads", "photos", userProfileId.ToString(), photo.StoredFileName);
+                    if (System.IO.File.Exists(filePath))
+                    {
+                        System.IO.File.Delete(filePath);
+                    }
+
+                    // Delete blurred version if it exists
+                    if (!string.IsNullOrEmpty(photo.BlurredFileName))
+                    {
+                        var blurredPath = Path.Combine("uploads", "photos", userProfileId.ToString(), photo.BlurredFileName);
+                        if (System.IO.File.Exists(blurredPath))
+                        {
+                            System.IO.File.Delete(blurredPath);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error deleting file for photo {PhotoId}", photo.Id);
+                }
+            }
+
+            // Delete database records
+            _context.Photos.RemoveRange(photos);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Deleted {Count} photos for user {UserProfileId}", count, userProfileId);
+            return Ok(count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting photos for user {UserProfileId}", userProfileId);
+            return StatusCode(500, "An error occurred while deleting user photos");
         }
     }
 }

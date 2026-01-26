@@ -132,6 +132,12 @@ builder.Services.AddHttpClient<ISafetyServiceClient, SafetyServiceClient>(client
     client.BaseAddress = new Uri(builder.Configuration["Gateway:BaseUrl"] ?? "http://dejting-yarp:8080");
 });
 
+// Matchmaking Service Client for match verification
+builder.Services.AddHttpClient<IMatchmakingServiceClient, MatchmakingServiceClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Gateway:BaseUrl"] ?? "http://dejting-yarp:8080");
+});
+
 var app = builder.Build();
 
 // ================================
