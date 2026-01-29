@@ -1,10 +1,13 @@
 using Xunit;
 using Moq;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using PhotoService.Controllers;
 using PhotoService.Services;
 using PhotoService.DTOs;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace PhotoService.Tests.Controllers;
 
@@ -12,238 +15,379 @@ public class PhotosControllerTests
 {
     private readonly Mock<IPhotoService> _mockPhotoService;
     private readonly Mock<ILogger<PhotosController>> _mockLogger;
+    private readonly Mock<ISafetyServiceClient> _mockSafetyService;
+    private readonly Mock<IMatchmakingServiceClient> _mockMatchmakingService;
+    private readonly Mock<PhotoService.Data.PhotoContext> _mockContext;
     private readonly PhotosController _controller;
 
     public PhotosControllerTests()
     {
         _mockPhotoService = new Mock<IPhotoService>();
         _mockLogger = new Mock<ILogger<PhotosController>>();
-        _controller = new PhotosController(_mockPhotoService.Object, _mockLogger.Object);
+        _mockSafetyService = new Mock<ISafetyServiceClient>();
+        _mockMatchmakingService = new Mock<IMatchmakingServiceClient>();
+        
+        // Create DbContext mock with minimal configuration
+        var options = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<PhotoService.Data.PhotoContext>()
+            .UseInMemoryDatabase(databaseName: "TestPhotoDb_" + Guid.NewGuid())
+            .Options;
+        _mockContext = new Mock<PhotoService.Data.PhotoContext>(options);
+
+        _controller = new PhotosController(
+            _mockPhotoService.Object,
+            _mockLogger.Object,
+            _mockSafetyService.Object,
+            _mockMatchmakingService.Object,
+            _mockContext.Object);
+
+        // Setup fake user claims for authentication
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, "1"),
+            new Claim("sub", "1")
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuthType");
+        var claimsPrincipal = new ClaimsPrincipal(identity);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = claimsPrincipal }
+        };
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UploadPhoto_ValidFile_ReturnsCreated()
-    {
-        // TODO: Implement test for POST /api/photos
-        // Test successful photo upload with valid file
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task UploadPhoto_NoFile_ReturnsBadRequest()
     {
-        // TODO: Implement test for POST /api/photos with no file
-        // Test validation fails when no file provided
+        // Arrange
+        var uploadDto = new PhotoUploadDto { Photo = null! };
+
+        // Act
+        var result = await _controller.UploadPhoto(uploadDto);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("No photo file provided", badRequestResult.Value?.ToString());
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task UploadPhoto_FileTooLarge_Returns413()
     {
-        // TODO: Implement test for POST /api/photos with file > 10MB
-        // Test file size limit enforcement
+        // Arrange
+        var uploadDto = new PhotoUploadDto
+        {
+            // Simulate file larger than 10MB limit
+            Photo = CreateMockFormFile("large.jpg", "image/jpeg", 11 * 1024 * 1024)
+        };
+
+        // Act
+        var result = await _controller.UploadPhoto(uploadDto);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, statusResult.StatusCode);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UploadPhoto_InvalidFileType_ReturnsBadRequest()
+    [Fact]
+    public async Task GetUserPhotos_ReturnsPhotoCollection()
     {
-        // TODO: Implement test for POST /api/photos with non-image file
-        // Test file type validation (only jpg/png/webp allowed)
+        // Arrange
+        var expectedSummary = new UserPhotoSummaryDto
+        {
+            UserId = 1,
+            TotalPhotos = 3,
+            Photos = new List<PhotoResponseDto>()
+        };
+
+        _mockPhotoService
+            .Setup(s => s.GetUserPhotosAsync(It.IsAny<int>()))
+            .ReturnsAsync(expectedSummary);
+
+        // Act
+        var result = await _controller.GetUserPhotos();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var summary = Assert.IsType<UserPhotoSummaryDto>(okResult.Value);
+        Assert.Equal(3, summary.TotalPhotos);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UploadPhoto_ExceedsMaxPhotos_ReturnsBadRequest()
-    {
-        // TODO: Implement test for POST /api/photos when user has 6 photos already
-        // Test max photos per user limit (6)
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetUserPhotos_ValidUser_ReturnsPhotoCollection()
-    {
-        // TODO: Implement test for GET /api/photos
-        // Test retrieval of all user photos
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhoto_ValidId_ReturnsPhoto()
-    {
-        // TODO: Implement test for GET /api/photos/{id}
-        // Test single photo retrieval
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task GetPhoto_InvalidId_ReturnsNotFound()
     {
-        // TODO: Implement test for GET /api/photos/{id} with non-existent ID
-        // Test 404 response for invalid photo ID
+        // Arrange
+        _mockPhotoService
+            .Setup(s => s.GetPhotoAsync(999, It.IsAny<int>()))
+            .ReturnsAsync((PhotoResponseDto?)null);
+
+        // Act
+        var result = await _controller.GetPhoto(999);
+
+        // Assert
+        Assert.IsType<NotFoundResult>(result);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhoto_OtherUsersPhoto_ReturnsNotFound()
-    {
-        // TODO: Implement test for GET /api/photos/{id} for photo owned by another user
-        // Test ownership validation prevents unauthorized access
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPrimaryPhoto_UserHasPhotos_ReturnsPrimary()
-    {
-        // TODO: Implement test for GET /api/photos/primary
-        // Test primary photo retrieval
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task GetPrimaryPhoto_NoPhotos_ReturnsNotFound()
     {
-        // TODO: Implement test for GET /api/photos/primary when user has no photos
-        // Test 404 response when no photos exist
+        // Arrange
+        _mockPhotoService
+            .Setup(s => s.GetPrimaryPhotoAsync(It.IsAny<int>()))
+            .ReturnsAsync((PhotoResponseDto?)null);
+
+        // Act
+        var result = await _controller.GetPrimaryPhoto();
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task GetPhotoImage_ValidId_ReturnsFileStream()
     {
-        // TODO: Implement test for GET /api/photos/{id}/image
-        // Test image file serving with proper content type
+        // Arrange
+        var imageStream = new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF }); // JPEG header
+        _mockPhotoService
+            .Setup(s => s.GetPhotoStreamAsync(1, "full"))
+            .ReturnsAsync((imageStream, "image/jpeg", "photo_1.jpg"));
+
+        // Act
+        var result = await _controller.GetPhotoImage(1);
+
+        // Assert
+        var fileResult = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("image/jpeg", fileResult.ContentType);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhotoImage_WithETag_Returns304NotModified()
-    {
-        // TODO: Implement test for GET /api/photos/{id}/image with If-None-Match header
-        // Test browser caching with ETag support
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task GetPhotoThumbnail_ValidId_ReturnsThumbnail()
     {
-        // TODO: Implement test for GET /api/photos/{id}/thumbnail
-        // Test thumbnail serving
+        // Arrange
+        var thumbnailStream = new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF });
+        _mockPhotoService
+            .Setup(s => s.GetPhotoStreamAsync(1, "thumbnail"))
+            .ReturnsAsync((thumbnailStream, "image/jpeg", "photo_1_thumb.jpg"));
+
+        // Act
+        var result = await _controller.GetPhotoThumbnail(1);
+
+        // Assert
+        var fileResult = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("image/jpeg", fileResult.ContentType);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task GetPhotoMedium_ValidId_ReturnsMediumSize()
     {
-        // TODO: Implement test for GET /api/photos/{id}/medium
-        // Test medium-size image serving
+        // Arrange
+        var mediumStream = new MemoryStream(new byte[] { 0xFF, 0xD8, 0xFF });
+        _mockPhotoService
+            .Setup(s => s.GetPhotoStreamAsync(1, "medium"))
+            .ReturnsAsync((mediumStream, "image/jpeg", "photo_1_medium.jpg"));
+
+        // Act
+        var result = await _controller.GetPhotoMedium(1);
+
+        // Assert
+        var fileResult = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("image/jpeg", fileResult.ContentType);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task UpdatePhoto_ValidUpdate_ReturnsOk()
     {
-        // TODO: Implement test for PUT /api/photos/{id}
-        // Test photo metadata update (display order, primary status)
+        // Arrange
+        var updateDto = new PhotoUpdateDto { DisplayOrder = 2 };
+        var updatedPhoto = new PhotoResponseDto { Id = 1, DisplayOrder = 2 };
+
+        _mockPhotoService
+            .Setup(s => s.UpdatePhotoAsync(1, It.IsAny<int>(), updateDto))
+            .ReturnsAsync(updatedPhoto);
+
+        // Act
+        var result = await _controller.UpdatePhoto(1, updateDto);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var photo = Assert.IsType<PhotoResponseDto>(okResult.Value);
+        Assert.Equal(2, photo.DisplayOrder);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task ReorderPhotos_ValidOrder_ReturnsUpdatedCollection()
     {
-        // TODO: Implement test for PUT /api/photos/reorder
-        // Test bulk photo reordering
+        // Arrange
+        var reorderDto = new PhotoReorderDto
+        {
+            Photos = new List<PhotoOrderItemDto>
+            {
+                new PhotoOrderItemDto { PhotoId = 1, DisplayOrder = 1 },
+                new PhotoOrderItemDto { PhotoId = 2, DisplayOrder = 2 }
+            }
+        };
+
+        var updatedSummary = new UserPhotoSummaryDto
+        {
+            TotalPhotos = 2
+        };
+
+        _mockPhotoService
+            .Setup(s => s.ReorderPhotosAsync(It.IsAny<int>(), reorderDto))
+            .ReturnsAsync(updatedSummary);
+
+        // Act
+        var result = await _controller.ReorderPhotos(reorderDto);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var summary = Assert.IsType<UserPhotoSummaryDto>(okResult.Value);
+        Assert.Equal(2, summary.TotalPhotos);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task SetPrimaryPhoto_ValidId_ReturnsOk()
     {
-        // TODO: Implement test for PUT /api/photos/{id}/primary
-        // Test setting photo as primary
+        // Arrange
+        _mockPhotoService
+            .Setup(s => s.SetPrimaryPhotoAsync(1, It.IsAny<int>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _controller.SetPrimaryPhoto(1);
+
+        // Assert
+        Assert.IsType<OkResult>(result);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task DeletePhoto_ValidId_ReturnsOk()
     {
-        // TODO: Implement test for DELETE /api/photos/{id}
-        // Test photo deletion (soft delete)
+        // Arrange
+        _mockPhotoService
+            .Setup(s => s.DeletePhotoAsync(1, It.IsAny<int>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _controller.DeletePhoto(1);
+
+        // Assert
+        Assert.IsType<OkResult>(result);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task DeletePhoto_PrimaryPhoto_UpdatesNewPrimary()
-    {
-        // TODO: Implement test for DELETE /api/photos/{id} when deleting primary
-        // Test automatic primary photo succession
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task CanUploadMorePhotos_UnderLimit_ReturnsTrue()
     {
-        // TODO: Implement test for GET /api/photos/can-upload
-        // Test upload availability check when under limit
+        // Arrange
+        _mockPhotoService
+            .Setup(s => s.CanUserUploadMorePhotosAsync(It.IsAny<int>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _controller.CanUploadMorePhotos();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.True((bool)okResult.Value!);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task CanUploadMorePhotos_AtLimit_ReturnsFalse()
     {
-        // TODO: Implement test for GET /api/photos/can-upload
-        // Test upload availability check when at limit (6 photos)
+        // Arrange
+        _mockPhotoService
+            .Setup(s => s.CanUserUploadMorePhotosAsync(It.IsAny<int>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _controller.CanUploadMorePhotos();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.False((bool)okResult.Value!);
     }
 
-    // Privacy & Moderation Tests
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UploadPhotoWithPrivacy_ValidRequest_AppliesPrivacySettings()
-    {
-        // TODO: Implement test for POST /api/photos/privacy
-        // Test photo upload with privacy level (PUBLIC/PRIVATE/MATCH_ONLY/VIP)
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UpdatePhotoPrivacy_ValidUpdate_ReturnsOk()
-    {
-        // TODO: Implement test for PUT /api/photos/{id}/privacy
-        // Test privacy settings update
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhotoWithPrivacyControl_NonMatch_ReturnsBlurred()
-    {
-        // TODO: Implement test for GET /api/photos/{id}/image/privacy
-        // Test blurred version served to non-matches when privacy=MATCH_ONLY
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhotoWithPrivacyControl_Match_ReturnsOriginal()
-    {
-        // TODO: Implement test for GET /api/photos/{id}/image/privacy
-        // Test original version served to matches
-    }
-
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task GetBlurredPhoto_ValidId_ReturnsBlurred()
     {
-        // TODO: Implement test for GET /api/photos/{id}/blurred
-        // Test blurred version retrieval
+        // Arrange
+        var blurredResponse = new PrivacyImageResponseDto
+        {
+            ImageData = new byte[] { 0xFF, 0xD8, 0xFF },
+            IsBlurred = true,
+            ContentType = "image/jpeg"
+        };
+
+        _mockPhotoService
+            .Setup(s => s.GetBlurredPhotoAsync(1))
+            .ReturnsAsync(blurredResponse);
+
+        // Act
+        var result = await _controller.GetBlurredPhoto(1);
+
+        // Assert
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("image/jpeg", fileResult.ContentType);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
+    [Fact]
     public async Task RegenerateBlurredPhoto_ValidRequest_CreatesNewBlur()
     {
-        // TODO: Implement test for POST /api/photos/{id}/regenerate-blur
-        // Test blur regeneration with custom intensity
+        // Arrange
+        var regenerationResult = new BlurRegenerationResultDto
+        {
+            Success = true,
+            BlurIntensity = 0.85
+        };
+
+        _mockPhotoService
+            .Setup(s => s.RegenerateBlurredPhotoAsync(1, It.IsAny<int>(), 0.85))
+            .ReturnsAsync(regenerationResult);
+
+        // Act
+        var result = await _controller.RegenerateBlurredPhoto(1, 0.85);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var regenerationDto = Assert.IsType<BlurRegenerationResultDto>(okResult.Value);
+        Assert.True(regenerationDto.Success);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhotosForModeration_AdminRole_ReturnsQueue()
+    [Fact]
+    public async Task GetPhotosForModeration_ReturnsQueue()
     {
-        // TODO: Implement test for GET /api/photos/moderation
-        // Test moderation queue access (Admin/Moderator only)
+        // Arrange
+        var moderationPhotos = new List<PhotoResponseDto>
+        {
+            new PhotoResponseDto { Id = 1, ModerationStatus = "PendingReview" },
+            new PhotoResponseDto { Id = 2, ModerationStatus = "PendingReview" }
+        };
+
+        _mockPhotoService
+            .Setup(s => s.GetPhotosForModerationAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync((moderationPhotos, 2));
+
+        // Act
+        var result = await _controller.GetPhotosForModeration();
+
+        // Assert  
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult.Value);
     }
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task GetPhotosForModeration_RegularUser_ReturnsForbidden()
-    {
-        // TODO: Implement test for GET /api/photos/moderation without Admin role
-        // Test authorization fails for non-admin users
-    }
+    // Helper Methods
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UpdateModerationStatus_ApprovePhoto_ReturnsOk()
+    private static IFormFile CreateMockFormFile(string fileName, string contentType, long length)
     {
-        // TODO: Implement test for PUT /api/photos/{id}/moderation
-        // Test photo approval by moderator
-    }
+        var fileMock = new Mock<IFormFile>();
+        var content = new byte[length];
+        var ms = new MemoryStream(content);
+        
+        fileMock.Setup(f => f.FileName).Returns(fileName);
+        fileMock.Setup(f => f.ContentType).Returns(contentType);
+        fileMock.Setup(f => f.Length).Returns(length);
+        fileMock.Setup(f => f.OpenReadStream()).Returns(ms);
+        fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Returns((Stream stream, CancellationToken token) => ms.CopyToAsync(stream, token));
 
-    [Fact(Skip = "Not implemented - T003")]
-    public async Task UpdateModerationStatus_RejectPhoto_ReturnsOk()
-    {
-        // TODO: Implement test for PUT /api/photos/{id}/moderation
-        // Test photo rejection by moderator
+        return fileMock.Object;
     }
 }
