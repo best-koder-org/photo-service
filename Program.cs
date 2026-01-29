@@ -4,15 +4,36 @@ using Microsoft.EntityFrameworkCore;
 using PhotoService.Data;
 using PhotoService.Extensions;
 using PhotoService.Services;
+using PhotoService.Common;
+using PhotoService.Common;
 using SixLabors.ImageSharp.Web.DependencyInjection;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Logging.AddSimpleConsole(options =>
-{
-    options.IncludeScopes = true;
-    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
-});
+// Configure Serilog
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentName()
+    .Enrich.WithMachineName()
+    .Enrich.WithCorrelationId()
+    .Enrich.WithProperty("ServiceName", "PhotoService")
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{ServiceName}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(
+        path: "logs/photo-service-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{ServiceName}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}"
+    ));
 
 // ================================
 // PHOTO SERVICE CONFIGURATION
@@ -100,6 +121,9 @@ builder.Services.AddScoped<IPhotoService, PhotoService.Services.PhotoService>();
 builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
 builder.Services.AddScoped<IStorageService, LocalStorageService>();
 
+// Background Services - Periodic cleanup and maintenance
+builder.Services.AddHostedService<PhotoCleanupBackgroundService>();
+
 // Add MediatR for CQRS
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
@@ -122,6 +146,10 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Internal API Key Authentication for service-to-service calls
+builder.Services.AddScoped<InternalApiKeyAuthFilter>();
+builder.Services.AddTransient<InternalApiKeyAuthHandler>();
+
 // HTTP Client for external service communication
 builder.Services.AddHttpClient();
 
@@ -129,13 +157,53 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<ISafetyServiceClient, SafetyServiceClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Gateway:BaseUrl"] ?? "http://dejting-yarp:8080");
-});
+})
+.AddHttpMessageHandler<InternalApiKeyAuthHandler>(); // Add internal API key to requests
 
 // Matchmaking Service Client for match verification
 builder.Services.AddHttpClient<IMatchmakingServiceClient, MatchmakingServiceClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Gateway:BaseUrl"] ?? "http://dejting-yarp:8080");
-});
+})
+.AddHttpMessageHandler<InternalApiKeyAuthHandler>(); // Add internal API key to requests
+
+// Configure OpenTelemetry for metrics and distributed tracing
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(serviceName: "photo-service",
+                    serviceVersion: "1.0.0"))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddMeter("PhotoService")
+        .AddPrometheusExporter())
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            options.RecordException = true;
+            options.Filter = (httpContext) =>
+            {
+                // Don't trace health checks and metrics endpoints
+                var path = httpContext.Request.Path.ToString();
+                return !path.Contains("/health") && !path.Contains("/metrics");
+            };
+        })
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation(options =>
+        {
+            options.SetDbStatementForText = true;
+            options.EnrichWithIDbCommand = (activity, command) =>
+            {
+                activity.SetTag("db.query", command.CommandText);
+            };
+        }));
+
+// Create custom meters for business metrics
+System.Diagnostics.Metrics.Meter customMeter = new("PhotoService");
+var photosUploadedCounter = customMeter.CreateCounter<long>("photos_uploaded_total", description: "Total number of photos uploaded");
+var photosDeletedCounter = customMeter.CreateCounter<long>("photos_deleted_total", description: "Total number of photos deleted");
+var photoProcessingDuration = customMeter.CreateHistogram<double>("photo_processing_duration_ms", description: "Duration of photo processing in milliseconds");
+var photoModerationScore = customMeter.CreateHistogram<double>("photo_moderation_score", description: "Distribution of photo moderation safety scores");
 
 var app = builder.Build();
 
@@ -192,6 +260,9 @@ app.MapControllers();
 
 // Health Check Endpoint - Standard for microservices
 app.MapGet("/health", () => new { Status = "Healthy", Service = "PhotoService", Timestamp = DateTime.UtcNow });
+
+// Prometheus metrics endpoint
+app.MapPrometheusScrapingEndpoint("/metrics");
 
 // Database Migration on Startup - Development convenience
 if (app.Environment.IsDevelopment())

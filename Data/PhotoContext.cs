@@ -172,6 +172,13 @@ public class PhotoContext : DbContext
 
         photoEntity.HasIndex(p => p.ModerationStatus)
             .HasDatabaseName("ix_photos_moderation_status");
+        
+        // T062: Additional composite indexes for query optimization  
+        photoEntity.HasIndex(p => new { p.UserId, p.IsDeleted, p.IsPrimary, p.DisplayOrder })
+            .HasDatabaseName("ix_photos_user_ordering");
+            
+        photoEntity.HasIndex(p => new { p.ModerationStatus, p.IsDeleted, p.CreatedAt })
+            .HasDatabaseName("ix_photos_moderation_queue");
 
         // Index for JSONB metadata (standard index for MySQL)
         photoEntity.HasIndex(p => p.Metadata)

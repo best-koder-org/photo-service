@@ -9,6 +9,22 @@
             Standardized API response wrapper
             </summary>
         </member>
+        <member name="T:PhotoService.Common.InternalApiKeyAuthFilter">
+            <summary>
+            Authorization filter that validates internal API keys for service-to-service endpoints
+            Apply with [ServiceCollectionExtension.RequireInternalApiKey] attribute
+            </summary>
+        </member>
+        <member name="T:PhotoService.Common.RequireInternalApiKeyAttribute">
+            <summary>
+            Attribute to require internal API key authentication on controller/action
+            </summary>
+        </member>
+        <member name="T:PhotoService.Common.InternalApiKeyAuthHandler">
+            <summary>
+            Delegating handler that adds internal API key to outgoing service-to-service requests
+            </summary>
+        </member>
         <member name="T:PhotoService.Common.Result`1">
             <summary>
             Result pattern for operation outcomes
@@ -816,6 +832,18 @@
             <summary>
             Error message if regeneration failed
             </summary>
+        </member>
+        <member name="T:PhotoService.Migrations.InitialMySQLSchema">
+            <inheritdoc />
+        </member>
+        <member name="M:PhotoService.Migrations.InitialMySQLSchema.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:PhotoService.Migrations.InitialMySQLSchema.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:PhotoService.Migrations.InitialMySQLSchema.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
         </member>
         <member name="T:PhotoService.Models.Photo">
             <summary>
@@ -1739,6 +1767,12 @@
         <member name="P:PhotoService.Services.StorageStatistics.AverageFileSizeBytes">
             <summary>
             Average file size in bytes
+            </summary>
+        </member>
+        <member name="T:PhotoService.Services.PhotoCleanupBackgroundService">
+            <summary>
+            Background service for cleaning up orphaned photos
+            Runs periodically to remove soft-deleted photos and files without database references
             </summary>
         </member>
         <member name="T:PhotoService.Services.PhotoService">

@@ -244,6 +244,7 @@ public class PhotoService : IPhotoService
     public async Task<UserPhotoSummaryDto> GetUserPhotosAsync(int userId)
     {
         var photos = await _context.Photos
+            .AsNoTracking()
             .Where(p => p.UserId == userId && !p.IsDeleted)
             .OrderBy(p => p.DisplayOrder)
             .ToListAsync();
@@ -311,6 +312,7 @@ public class PhotoService : IPhotoService
     public async Task<PhotoResponseDto?> GetPrimaryPhotoAsync(int userId)
     {
         var photo = await _context.Photos
+            .AsNoTracking()
             .Where(p => p.UserId == userId && !p.IsDeleted)
             .OrderByDescending(p => p.IsPrimary)
             .ThenBy(p => p.DisplayOrder)
@@ -492,6 +494,7 @@ public class PhotoService : IPhotoService
     public async Task<bool> CanUserUploadMorePhotosAsync(int userId)
     {
         var currentCount = await _context.Photos
+            .AsNoTracking()
             .CountAsync(p => p.UserId == userId && !p.IsDeleted);
 
         return currentCount < PhotoConstants.MaxPhotosPerUser;
@@ -506,6 +509,7 @@ public class PhotoService : IPhotoService
         int pageSize = 50)
     {
         var query = _context.Photos
+            .AsNoTracking()
             .Where(p => p.ModerationStatus == status && !p.IsDeleted);
 
         var totalCount = await query.CountAsync();
@@ -565,6 +569,7 @@ public class PhotoService : IPhotoService
     private async Task<int> GetNextDisplayOrderAsync(int userId)
     {
         var maxOrder = await _context.Photos
+            .AsNoTracking()
             .Where(p => p.UserId == userId && !p.IsDeleted)
             .MaxAsync(p => (int?)p.DisplayOrder) ?? 0;
 
@@ -577,6 +582,7 @@ public class PhotoService : IPhotoService
     private async Task UnsetAllPrimaryPhotosAsync(int userId)
     {
         var primaryPhotos = await _context.Photos
+            .AsNoTracking()
             .Where(p => p.UserId == userId && p.IsPrimary && !p.IsDeleted)
             .ToListAsync();
 
