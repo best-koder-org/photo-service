@@ -1058,6 +1058,34 @@ public class PhotosController : ControllerBase
             return StatusCode(500, "An error occurred while deleting user photos");
         }
     }
+
+    /// <summary>
+    /// Get photos for a user in the spec-aligned PhotoAssetDto format.
+    /// GET /api/photos/assets/{userId}
+    /// Used by other services and frontend to get the unified photo shape.
+    /// </summary>
+    [HttpGet("assets/{userId}")]
+    [ProducesResponseType(typeof(List<PhotoAssetDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPhotoAssets(string userId)
+    {
+        try
+        {
+            var requestingUserId = GetCurrentUserId();
+            var photos = await _context.Photos
+                .Where(p => p.UserId.ToString() == userId && p.ModerationStatus == "Approved")
+                .OrderBy(p => p.DisplayOrder)
+                .ToListAsync();
+
+            var assets = photos.ToAssetDtos();
+            return Ok(assets);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving photo assets for user {UserId}", userId);
+            return StatusCode(500, "Error retrieving photo assets");
+        }
+    }
 }
 
 /// <summary>

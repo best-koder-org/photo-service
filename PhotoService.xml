@@ -248,6 +248,13 @@
             <param name="userProfileId">User profile ID whose photos should be deleted</param>
             <returns>Number of photos deleted</returns>
         </member>
+        <member name="M:PhotoService.Controllers.PhotosController.GetPhotoAssets(System.String)">
+            <summary>
+            Get photos for a user in the spec-aligned PhotoAssetDto format.
+            GET /api/photos/assets/{userId}
+            Used by other services and frontend to get the unified photo shape.
+            </summary>
+        </member>
         <member name="T:PhotoService.Controllers.ModerationUpdateRequest">
             <summary>
             Request model for moderation status updates
@@ -831,6 +838,51 @@
         <member name="P:PhotoService.DTOs.BlurRegenerationResultDto.ErrorMessage">
             <summary>
             Error message if regeneration failed
+            </summary>
+        </member>
+        <member name="T:PhotoService.DTOs.PhotoAssetDto">
+            <summary>
+            Spec-aligned photo asset DTO.
+            Aggregates data from Photo model into the shape defined in api-spec.md:
+              { id, url, blurUrl, privacyLevel, moderationStatus, orderIndex }
+            </summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.Id">
+            <summary>Unique photo identifier</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.Url">
+            <summary>URL for the display-sized photo (medium/responsive)</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.BlurUrl">
+            <summary>Blurred/privacy-safe URL for non-matched users</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.FullUrl">
+            <summary>Full-size photo URL (available after match or if public)</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.ThumbnailUrl">
+            <summary>Thumbnail URL for list views</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.PrivacyLevel">
+            <summary>Privacy level: public, match-only, private</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.ModerationStatus">
+            <summary>Content moderation status: pending, approved, rejected</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.OrderIndex">
+            <summary>Display order in user's photo gallery (1-based)</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.IsPrimary">
+            <summary>Whether this is the primary profile photo</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.Width">
+            <summary>Image dimensions</summary>
+        </member>
+        <member name="P:PhotoService.DTOs.PhotoAssetDto.CreatedAt">
+            <summary>Upload timestamp</summary>
+        </member>
+        <member name="T:PhotoService.DTOs.PhotoAssetMapper">
+            <summary>
+            Extension to map Photo model → PhotoAssetDto (spec-aligned).
             </summary>
         </member>
         <member name="T:PhotoService.Migrations.InitialMySQLSchema">
