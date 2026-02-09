@@ -35,6 +35,23 @@
             Result pattern for operations without return value
             </summary>
         </member>
+        <member name="T:PhotoService.Controllers.HealthController">
+            <summary>
+            Health check controller for photo-service.
+            Reports service health, database connectivity, and storage availability.
+            Consistent with HealthController pattern in other services.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.HealthController.GetHealth">
+            <summary>
+            Basic health check — always returns 200 if service is running.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.HealthController.GetDetailedHealth">
+            <summary>
+            Detailed health check — includes database and storage status.
+            </summary>
+        </member>
         <member name="M:PhotoService.Controllers.PhotoDeletionController.DeleteUserPhotos(System.Int32)">
             <summary>
             Cascade delete all photos for a user (called during account deletion)
