@@ -288,6 +288,24 @@
             Optional moderation notes
             </summary>
         </member>
+        <member name="T:PhotoService.Controllers.VerificationController">
+            <summary>
+            Face verification endpoint for self-hosted DeepFace verification badges.
+            POST /api/verification/submit — accepts selfie, compares to profile photo.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VerificationController.SubmitVerification(Microsoft.AspNetCore.Http.IFormFile)">
+            <summary>
+            Submit a selfie for face verification against profile photo.
+            Uses DeepFace Facenet512 with anti-spoofing.
+            Rate limited: max 3 attempts per 24 hours.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VerificationController.GetStatus">
+            <summary>
+            Get current verification status for the authenticated user.
+            </summary>
+        </member>
         <member name="T:PhotoService.Data.PhotoContext">
             <summary>
             MySQL-optimized Entity Framework context for photo management
@@ -309,6 +327,7 @@
             Automatically update timestamps on entity changes
             </summary>
         </member>
+        <!-- Badly formed XML comment ignored for member "T:PhotoService.Data.VerificationDbContext" -->
         <member name="T:PhotoService.DTOs.PhotoUploadDto">
             <summary>
             Data Transfer Object for photo upload requests
@@ -1169,6 +1188,17 @@
         <member name="T:PhotoService.Models.PhotoConstants">
             <summary>
             Photo constants and configuration
+            </summary>
+        </member>
+        <member name="T:PhotoService.Models.VerificationAttempt">
+            <summary>
+            Tracks face verification attempts for self-hosted DeepFace badge system.
+            </summary>
+        </member>
+        <member name="T:PhotoService.Services.IFaceVerificationService">
+            <summary>
+            Face verification service using self-hosted DeepFace container.
+            Compares selfie against profile photo using Facenet512 model.
             </summary>
         </member>
         <member name="T:PhotoService.Services.ImageProcessingService">
