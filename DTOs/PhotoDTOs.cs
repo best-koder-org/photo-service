@@ -604,3 +604,75 @@ public class BlurRegenerationResultDto
     /// </summary>
     public string? ErrorMessage { get; set; }
 }
+
+/// <summary>
+/// Spec-aligned photo asset DTO.
+/// Aggregates data from Photo model into the shape defined in api-spec.md:
+///   { id, url, blurUrl, privacyLevel, moderationStatus, orderIndex }
+/// </summary>
+public class PhotoAssetDto
+{
+    /// <summary>Unique photo identifier</summary>
+    public int Id { get; set; }
+
+    /// <summary>URL for the display-sized photo (medium/responsive)</summary>
+    public string Url { get; set; } = string.Empty;
+
+    /// <summary>Blurred/privacy-safe URL for non-matched users</summary>
+    public string? BlurUrl { get; set; }
+
+    /// <summary>Full-size photo URL (available after match or if public)</summary>
+    public string? FullUrl { get; set; }
+
+    /// <summary>Thumbnail URL for list views</summary>
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>Privacy level: public, match-only, private</summary>
+    public string PrivacyLevel { get; set; } = "public";
+
+    /// <summary>Content moderation status: pending, approved, rejected</summary>
+    public string ModerationStatus { get; set; } = "pending";
+
+    /// <summary>Display order in user's photo gallery (1-based)</summary>
+    public int OrderIndex { get; set; }
+
+    /// <summary>Whether this is the primary profile photo</summary>
+    public bool IsPrimary { get; set; }
+
+    /// <summary>Image dimensions</summary>
+    public int Width { get; set; }
+    public int Height { get; set; }
+
+    /// <summary>Upload timestamp</summary>
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Extension to map Photo model → PhotoAssetDto (spec-aligned).
+/// </summary>
+public static class PhotoAssetMapper
+{
+    public static PhotoAssetDto ToAssetDto(this Models.Photo photo)
+    {
+        return new PhotoAssetDto
+        {
+            Id = photo.Id,
+            Url = photo.Url,
+            BlurUrl = string.IsNullOrEmpty(photo.BlurredFileName) ? null : photo.BlurredUrl,
+            FullUrl = photo.Url,
+            ThumbnailUrl = null, // TODO: wire up when thumbnail gen is ready
+            PrivacyLevel = photo.PrivacyLevel,
+            ModerationStatus = photo.ModerationStatus,
+            OrderIndex = photo.DisplayOrder,
+            IsPrimary = photo.IsPrimary,
+            Width = photo.Width,
+            Height = photo.Height,
+            CreatedAt = photo.CreatedAt
+        };
+    }
+
+    public static List<PhotoAssetDto> ToAssetDtos(this IEnumerable<Models.Photo> photos)
+    {
+        return photos.Select(p => p.ToAssetDto()).ToList();
+    }
+}
