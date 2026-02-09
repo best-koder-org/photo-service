@@ -258,8 +258,7 @@ app.UseImageSharp();
 // API Controllers
 app.MapControllers();
 
-// Health Check Endpoint - Standard for microservices
-app.MapGet("/health", () => new { Status = "Healthy", Service = "PhotoService", Timestamp = DateTime.UtcNow });
+// Health check now handled by HealthController
 
 // Prometheus metrics endpoint
 app.MapPrometheusScrapingEndpoint("/metrics");
