@@ -19,13 +19,13 @@ public class LocalStorageService : IStorageService
     {
         _logger = logger;
         _configuration = configuration;
-        
+
         // Get storage path from configuration or use default
         _baseStoragePath = _configuration.GetValue<string>("Storage:PhotosPath") ?? "wwwroot/uploads/photos";
-        
+
         // Ensure base directory exists
         Directory.CreateDirectory(_baseStoragePath);
-        
+
         _logger.LogInformation("LocalStorageService initialized with base path: {BasePath}", _baseStoragePath);
     }
 
@@ -144,7 +144,7 @@ public class LocalStorageService : IStorageService
             result.FileName = fileName;
             result.FileSize = fileInfo.Length;
 
-            _logger.LogInformation("Successfully stored image for user {UserId}: {FileName} ({FileSize} bytes)", 
+            _logger.LogInformation("Successfully stored image for user {UserId}: {FileName} ({FileSize} bytes)",
                 userId, fileName, result.FileSize);
 
             return result;
@@ -184,7 +184,7 @@ public class LocalStorageService : IStorageService
         try
         {
             var fullPath = GetFullFilePath(filePath);
-            
+
             if (!File.Exists(fullPath))
             {
                 _logger.LogWarning("Image file not found: {FilePath}", filePath);
@@ -193,7 +193,7 @@ public class LocalStorageService : IStorageService
 
             // Return FileStream with read-only access and sequential access hint
             // This is optimized for web serving scenarios
-            var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 
+            var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read,
                 bufferSize: 4096, FileOptions.SequentialScan);
 
             _logger.LogDebug("Serving image stream: {FilePath}", filePath);
@@ -225,7 +225,7 @@ public class LocalStorageService : IStorageService
         try
         {
             var fullPath = GetFullFilePath(filePath);
-            
+
             if (!File.Exists(fullPath))
             {
                 _logger.LogWarning("Attempted to delete non-existent file: {FilePath}", filePath);
@@ -233,7 +233,7 @@ public class LocalStorageService : IStorageService
             }
 
             File.Delete(fullPath);
-            
+
             _logger.LogInformation("Successfully deleted image: {FilePath}", filePath);
             return await Task.FromResult(true);
         }
@@ -281,7 +281,7 @@ public class LocalStorageService : IStorageService
         try
         {
             var fullPath = GetFullFilePath(filePath);
-            
+
             if (!File.Exists(fullPath))
                 return 0;
 
@@ -417,7 +417,7 @@ public class LocalStorageService : IStorageService
         }
 
         var relativePath = Path.GetRelativePath(normalizedBasePath, normalizedFullPath);
-        
+
         // Normalize to forward slashes for web compatibility
         return relativePath.Replace(Path.DirectorySeparatorChar, '/');
     }
@@ -478,17 +478,17 @@ public class LocalStorageService : IStorageService
             }
 
             var allFiles = Directory.GetFiles(_baseStoragePath, "*", SearchOption.AllDirectories);
-            
+
             stats.TotalFiles = allFiles.Length;
             stats.TotalSizeBytes = allFiles.Sum(f => new FileInfo(f).Length);
-            
+
             var userDirectories = Directory.GetDirectories(_baseStoragePath);
             stats.UserDirectories = userDirectories.Length;
 
             // Calculate by file type
             var extensions = allFiles.GroupBy(f => Path.GetExtension(f).ToLowerInvariant())
                                    .ToDictionary(g => g.Key, g => g.Count());
-            
+
             stats.FilesByExtension = extensions;
 
             _logger.LogDebug("Storage statistics: {TotalFiles} files, {TotalSize} bytes, {UserDirs} user directories",

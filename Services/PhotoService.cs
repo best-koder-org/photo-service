@@ -62,7 +62,7 @@ public class PhotoService : IPhotoService
             // Validate file format and content
             using var validationStream = uploadDto.Photo.OpenReadStream();
             var validation = await _imageProcessing.ValidateImageAsync(validationStream, uploadDto.Photo.FileName);
-            
+
             if (!validation.IsValid)
             {
                 result.ErrorMessage = validation.ErrorMessage ?? "Invalid image file";
@@ -224,7 +224,7 @@ public class PhotoService : IPhotoService
                 Urls = GeneratePhotoUrls(photo.Id)
             };
 
-            _logger.LogInformation("Photo upload completed successfully for user {UserId}, photo ID {PhotoId}", 
+            _logger.LogInformation("Photo upload completed successfully for user {UserId}, photo ID {PhotoId}",
                 userId, photo.Id);
 
             return result;
@@ -407,10 +407,10 @@ public class PhotoService : IPhotoService
             return false;
 
         await UnsetAllPrimaryPhotosAsync(userId);
-        
+
         photo.IsPrimary = true;
         photo.UpdatedAt = DateTime.UtcNow;
-        
+
         await _context.SaveChangesAsync();
         return true;
     }
@@ -504,8 +504,8 @@ public class PhotoService : IPhotoService
     /// Get photos pending moderation review
     /// </summary>
     public async Task<(List<PhotoResponseDto> photos, int totalCount)> GetPhotosForModerationAsync(
-        string status = Models.ModerationStatus.PendingReview, 
-        int pageNumber = 1, 
+        string status = Models.ModerationStatus.PendingReview,
+        int pageNumber = 1,
         int pageSize = 50)
     {
         var query = _context.Photos
@@ -656,7 +656,7 @@ public class PhotoService : IPhotoService
 
         try
         {
-            _logger.LogInformation("Starting privacy photo upload for user {UserId} with privacy level {PrivacyLevel}", 
+            _logger.LogInformation("Starting privacy photo upload for user {UserId} with privacy level {PrivacyLevel}",
                 userId, uploadDto.PrivacyLevel);
 
             // Validate user can upload more photos
@@ -709,13 +709,13 @@ public class PhotoService : IPhotoService
                 DisplayOrder = uploadDto.DisplayOrder ?? await GetNextDisplayOrderAsync(userId),
                 QualityScore = privacyProcessing.StandardProcessingResult.QualityScore,
                 CreatedAt = DateTime.UtcNow,
-                
+
                 // Privacy features
                 PrivacyLevel = uploadDto.PrivacyLevel,
                 BlurIntensity = uploadDto.BlurIntensity,
                 RequiresMatch = ShouldRequireMatch(uploadDto.PrivacyLevel),
                 BlurredFileName = privacyProcessing.BlurredFileName,
-                
+
                 // Content moderation
                 ModerationStatus = DetermineModerationStatus(privacyProcessing.ModerationAnalysis),
                 SafetyScore = privacyProcessing.ModerationAnalysis?.SafetyScore,
@@ -726,10 +726,10 @@ public class PhotoService : IPhotoService
             if (privacyProcessing.ModerationAnalysis != null)
             {
                 photo.SetModerationResults(privacyProcessing.ModerationAnalysis);
-                
+
                 // T027: Audit log for content moderation decisions
                 _logger.LogInformation("[PhotoModeration] Photo moderated - PhotoId: (pending), UserId: {UserId}, SafetyScore: {SafetyScore:F2}, Status: {Status}, PrivacyLevel: {PrivacyLevel}, Issues: [{Issues}]",
-                    userId, 
+                    userId,
                     privacyProcessing.ModerationAnalysis.SafetyScore,
                     photo.ModerationStatus,
                     uploadDto.PrivacyLevel,
@@ -743,7 +743,7 @@ public class PhotoService : IPhotoService
                 userId,
                 photo.StoredFileName,
                 useProvidedFileName: true);
-            
+
             if (!storageResult.Success)
             {
                 result.ErrorMessage = storageResult.ErrorMessage ?? "Failed to store image";
@@ -789,7 +789,7 @@ public class PhotoService : IPhotoService
 
             // T027: Telemetry for photo upload success with performance metrics
             _logger.LogInformation("[PhotoUpload] \u2713 Photo uploaded successfully - UserId: {UserId}, PhotoId: {PhotoId}, ProcessingTime: {ProcessingTime}ms, QualityScore: {QualityScore}, PrivacyLevel: {PrivacyLevel}, BlurGenerated: {BlurGenerated}, FileSize: {FileSizeMB:F2}MB",
-                userId, photo.Id, result.ProcessingTimeMs, photo.QualityScore, photo.PrivacyLevel, 
+                userId, photo.Id, result.ProcessingTimeMs, photo.QualityScore, photo.PrivacyLevel,
                 !string.IsNullOrEmpty(photo.BlurredFileName),
                 photo.FileSizeBytes / (1024.0 * 1024.0));
 
@@ -800,7 +800,7 @@ public class PhotoService : IPhotoService
             // T027: Error telemetry for photo upload failures
             _logger.LogError(ex, "[PhotoUpload] ERROR - UserId: {UserId}, FileName: {FileName}, ErrorMessage: {ErrorMessage}",
                 userId, uploadDto.Photo.FileName, ex.Message);
-            
+
             stopwatch.Stop();
             result.ProcessingTimeMs = (int)stopwatch.ElapsedMilliseconds;
             result.ErrorMessage = "An error occurred during photo upload";
@@ -846,7 +846,7 @@ public class PhotoService : IPhotoService
     {
         // Implementation placeholder - basic privacy control
         var response = new PrivacyImageResponseDto();
-        
+
         var photo = await _context.Photos
             .FirstOrDefaultAsync(p => p.Id == photoId && !p.IsDeleted);
 
@@ -880,7 +880,7 @@ public class PhotoService : IPhotoService
     {
         // Implementation placeholder - return basic response for now
         var response = new PrivacyImageResponseDto();
-        
+
         var photo = await _context.Photos
             .FirstOrDefaultAsync(p => p.Id == photoId && !p.IsDeleted);
 
@@ -913,7 +913,7 @@ public class PhotoService : IPhotoService
         // Update blur intensity
         photo.BlurIntensity = blurIntensity;
         photo.UpdatedAt = DateTime.UtcNow;
-        
+
         await _context.SaveChangesAsync();
 
         return new BlurRegenerationResultDto
@@ -939,7 +939,7 @@ public class PhotoService : IPhotoService
     private static string DetermineModerationStatus(ModerationAnalysis? analysis)
     {
         if (analysis == null) return ModerationStatus.PendingReview;
-        
+
         return analysis.SafetyScore >= 0.8 ? ModerationStatus.AutoApproved :
                analysis.SafetyScore >= 0.6 ? ModerationStatus.PendingReview :
                ModerationStatus.Rejected;
@@ -954,7 +954,7 @@ public class PhotoService : IPhotoService
             BlurIntensity = processing.ModerationAnalysis?.SafetyScore ?? 0.8,
             RequiresMatch = ShouldRequireMatch(privacyLevel),
             PrivacyLevel = privacyLevel,
-            VIPFeatures = processing.EnhancedPrivacyFeatures != null 
+            VIPFeatures = processing.EnhancedPrivacyFeatures != null
                 ? new VIPPrivacyFeaturesDto
                 {
                     HasAdvancedBlur = processing.EnhancedPrivacyFeatures.HasAdvancedBlur,

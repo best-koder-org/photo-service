@@ -172,11 +172,11 @@ public class PhotoContext : DbContext
 
         photoEntity.HasIndex(p => p.ModerationStatus)
             .HasDatabaseName("ix_photos_moderation_status");
-        
+
         // T062: Additional composite indexes for query optimization  
         photoEntity.HasIndex(p => new { p.UserId, p.IsDeleted, p.IsPrimary, p.DisplayOrder })
             .HasDatabaseName("ix_photos_user_ordering");
-            
+
         photoEntity.HasIndex(p => new { p.ModerationStatus, p.IsDeleted, p.CreatedAt })
             .HasDatabaseName("ix_photos_moderation_queue");
 
@@ -189,13 +189,13 @@ public class PhotoContext : DbContext
             .HasDatabaseName("ix_photos_tags");
 
         // Constraints
-        photoEntity.HasCheckConstraint("ck_photos_quality_score_range", 
+        photoEntity.HasCheckConstraint("ck_photos_quality_score_range",
             "quality_score >= 0 AND quality_score <= 100");
-        photoEntity.HasCheckConstraint("ck_photos_display_order_positive", 
+        photoEntity.HasCheckConstraint("ck_photos_display_order_positive",
             "display_order > 0");
-        photoEntity.HasCheckConstraint("ck_photos_dimensions_positive", 
+        photoEntity.HasCheckConstraint("ck_photos_dimensions_positive",
             "width > 0 AND height > 0");
-        photoEntity.HasCheckConstraint("ck_photos_file_size_positive", 
+        photoEntity.HasCheckConstraint("ck_photos_file_size_positive",
             "file_size_bytes > 0");
     }
 

@@ -30,9 +30,9 @@ public class CorrelationIdMiddleware
         context.Items[HeaderName] = correlationId;
 
         using (_logger.BeginScope(new Dictionary<string, object>
-               {
-                   [HeaderName] = correlationId
-               }))
+        {
+            [HeaderName] = correlationId
+        }))
         {
             context.Response.OnStarting(() =>
             {

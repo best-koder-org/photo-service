@@ -106,8 +106,8 @@ public interface IPhotoService
     /// <param name="pageSize">Number of items per page</param>
     /// <returns>Paginated list of photos for review</returns>
     Task<(List<PhotoResponseDto> photos, int totalCount)> GetPhotosForModerationAsync(
-        string status = Models.ModerationStatus.PendingReview, 
-        int pageNumber = 1, 
+        string status = Models.ModerationStatus.PendingReview,
+        int pageNumber = 1,
         int pageSize = 50);
 
     /// <summary>
@@ -257,8 +257,8 @@ public interface IImageProcessingService
     /// <param name="blurIntensity">Blur intensity for private photos</param>
     /// <returns>Privacy processing results</returns>
     Task<PrivacyPhotoProcessingResult> ProcessPhotoWithPrivacyAsync(
-        byte[] originalImageData, 
-        string originalFileName, 
+        byte[] originalImageData,
+        string originalFileName,
         string privacyLevel,
         double blurIntensity = 0.8);
 
@@ -271,8 +271,8 @@ public interface IImageProcessingService
     /// <param name="hasMatch">Whether requesting user has matched with photo owner</param>
     /// <returns>Image data (original or blurred) or null if access denied</returns>
     Task<byte[]?> GetImageWithPrivacyControlAsync(
-        Photo photo, 
-        string requestingUserId, 
+        Photo photo,
+        string requestingUserId,
         bool hasMatch = false);
 }
 

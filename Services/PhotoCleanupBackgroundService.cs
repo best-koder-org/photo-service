@@ -99,7 +99,7 @@ public class PhotoCleanupBackgroundService : BackgroundService
         {
             // Clean up soft-deleted photos older than grace period
             var gracePeriodCutoff = DateTime.UtcNow.AddDays(-gracePeriodDays);
-            
+
             _logger.LogInformation(
                 "Finding soft-deleted photos older than {GracePeriod} days (before {Cutoff})",
                 gracePeriodDays, gracePeriodCutoff);
@@ -154,7 +154,7 @@ public class PhotoCleanupBackgroundService : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete photo {PhotoId} for user {UserId}", 
+                    _logger.LogWarning(ex, "Failed to delete photo {PhotoId} for user {UserId}",
                         photo.Id, photo.UserId);
                 }
             }
@@ -182,7 +182,7 @@ public class PhotoCleanupBackgroundService : BackgroundService
                 validFilePaths.Add($"{photo.UserId}/{photo.StoredFileName}");
                 validFilePaths.Add(GetThumbnailPath(photo.StoredFileName, photo.UserId));
                 validFilePaths.Add(GetMediumPath(photo.StoredFileName, photo.UserId));
-                
+
                 if (!string.IsNullOrEmpty(photo.BlurredFileName))
                 {
                     validFilePaths.Add($"{photo.UserId}/{photo.BlurredFileName}");
