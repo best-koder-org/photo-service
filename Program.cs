@@ -94,7 +94,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Database Configuration - MySQL for consistency across all services
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
                       Environment.GetEnvironmentVariable("DATABASE_URL") ??
                       "Server=localhost;Port=3311;Database=PhotoServiceDb;User=photoservice_user;Password=photoservice_user_password;";
 

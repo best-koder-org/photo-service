@@ -31,7 +31,7 @@ public class PhotosController : ControllerBase
     /// Standard controller pattern with service layer integration
     /// </summary>
     public PhotosController(
-        IPhotoService photoService, 
+        IPhotoService photoService,
         ILogger<PhotosController> logger,
         ISafetyServiceClient safetyService,
         IMatchmakingServiceClient matchmakingService,
@@ -63,7 +63,7 @@ public class PhotosController : ControllerBase
         try
         {
             var userId = GetCurrentUserId();
-            
+
             _logger.LogInformation("Photo upload request from user {UserId}", userId);
 
             // ================================
@@ -76,7 +76,7 @@ public class PhotosController : ControllerBase
                 var errors = ModelState
                     .SelectMany(x => x.Value?.Errors?.Select(e => e.ErrorMessage) ?? [])
                     .ToList();
-                
+
                 return BadRequest($"Validation failed: {string.Join(", ", errors)}");
             }
 
@@ -88,7 +88,7 @@ public class PhotosController : ControllerBase
             // Check file size at request level
             if (uploadDto.Photo.Length > Models.PhotoConstants.MaxFileSizeBytes)
             {
-                return StatusCode(StatusCodes.Status413RequestEntityTooLarge, 
+                return StatusCode(StatusCodes.Status413RequestEntityTooLarge,
                     $"File size exceeds maximum limit of {Models.PhotoConstants.MaxFileSizeBytes / (1024 * 1024)} MB");
             }
 
@@ -105,7 +105,7 @@ public class PhotosController : ControllerBase
                 return BadRequest(result.ErrorMessage);
             }
 
-            _logger.LogInformation("Photo uploaded successfully for user {UserId}, photo ID {PhotoId}", 
+            _logger.LogInformation("Photo uploaded successfully for user {UserId}, photo ID {PhotoId}",
                 userId, result.Photo?.Id);
 
             // ================================
@@ -114,14 +114,14 @@ public class PhotosController : ControllerBase
             // ================================
 
             return CreatedAtAction(
-                nameof(GetPhoto), 
-                new { id = result.Photo!.Id }, 
+                nameof(GetPhoto),
+                new { id = result.Photo!.Id },
                 result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during photo upload");
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while uploading the photo");
         }
     }
@@ -143,7 +143,7 @@ public class PhotosController : ControllerBase
             var userId = GetCurrentUserId();
             var photos = await _photoService.GetUserPhotosAsync(userId);
 
-            _logger.LogDebug("Retrieved {PhotoCount} photos for user {UserId}", 
+            _logger.LogDebug("Retrieved {PhotoCount} photos for user {UserId}",
                 photos.TotalPhotos, userId);
 
             return Ok(photos);
@@ -151,7 +151,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving user photos");
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while retrieving photos");
         }
     }
@@ -186,7 +186,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving photo {PhotoId}", id);
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while retrieving the photo");
         }
     }
@@ -219,7 +219,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving primary photo for user");
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while retrieving the primary photo");
         }
     }
@@ -260,9 +260,9 @@ public class PhotosController : ControllerBase
             // 2. Match verification (NEW)
             // 3. Serve blurred version if not matched
             // ================================
-            
+
             bool serveBlurred = false;
-            
+
             if (User.Identity?.IsAuthenticated == true)
             {
                 try
@@ -284,7 +284,7 @@ public class PhotosController : ControllerBase
 
                         if (isBlocked)
                         {
-                            _logger.LogWarning("User {RequesterId} attempted to access photo {PhotoId} owned by blocked user {PhotoOwnerId}", 
+                            _logger.LogWarning("User {RequesterId} attempted to access photo {PhotoId} owned by blocked user {PhotoOwnerId}",
                                 requesterId, id, photoOwnerId);
                             return StatusCode(StatusCodes.Status403Forbidden, "Access denied");
                         }
@@ -294,10 +294,10 @@ public class PhotosController : ControllerBase
                         // If users are not matched, serve blurred version
                         // ================================
                         var areMatched = await _matchmakingService.AreUsersMatchedAsync(requesterId, ownerId);
-                        
+
                         if (!areMatched)
                         {
-                            _logger.LogInformation("User {RequesterId} requested photo {PhotoId} from non-matched user {PhotoOwnerId} - serving blurred version", 
+                            _logger.LogInformation("User {RequesterId} requested photo {PhotoId} from non-matched user {PhotoOwnerId} - serving blurred version",
                                 requesterId, id, photoOwnerId);
                             serveBlurred = true;
                         }
@@ -323,12 +323,12 @@ public class PhotosController : ControllerBase
             Stream stream;
             string contentType;
             string fileName;
-            
+
             if (serveBlurred)
             {
                 // Serve blurred version
                 var blurResult = await _photoService.GetBlurredPhotoAsync(id);
-                
+
                 if (blurResult.ImageData == null)
                 {
                     // If blurred version doesn't exist, generate it on-the-fly
@@ -342,7 +342,7 @@ public class PhotosController : ControllerBase
                     origStream.Dispose();
                     return NotFound("Blurred version not available");
                 }
-                
+
                 stream = new MemoryStream(blurResult.ImageData);
                 contentType = blurResult.ContentType;
                 fileName = blurResult.FileName;
@@ -351,7 +351,7 @@ public class PhotosController : ControllerBase
             {
                 // Serve original version
                 (stream, contentType, fileName) = await _photoService.GetPhotoStreamAsync(id, size);
-                
+
                 if (stream == null)
                 {
                     return NotFound("Photo not found");
@@ -364,7 +364,7 @@ public class PhotosController : ControllerBase
             // ================================
             Response.Headers.CacheControl = "public, max-age=3600"; // Cache for 1 hour
             Response.Headers.ETag = $"\"{id}_{size}_{(serveBlurred ? "blurred" : "original")}\"";
-            
+
             // Check if client has cached version
             var etag = Request.Headers.IfNoneMatch.FirstOrDefault();
             if (etag == $"\"{id}_{size}_{(serveBlurred ? "blurred" : "original")}\"")
@@ -373,7 +373,7 @@ public class PhotosController : ControllerBase
                 return StatusCode(StatusCodes.Status304NotModified);
             }
 
-            _logger.LogDebug("Serving {Version} photo {PhotoId} ({Size}) to client", 
+            _logger.LogDebug("Serving {Version} photo {PhotoId} ({Size}) to client",
                 serveBlurred ? "blurred" : "original", id, size);
 
             return File(stream, contentType, fileName, enableRangeProcessing: true);
@@ -381,7 +381,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error serving photo image {PhotoId}", id);
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while retrieving the image");
         }
     }
@@ -441,7 +441,7 @@ public class PhotosController : ControllerBase
                 var errors = ModelState
                     .SelectMany(x => x.Value?.Errors?.Select(e => e.ErrorMessage) ?? [])
                     .ToList();
-                
+
                 return BadRequest($"Validation failed: {string.Join(", ", errors)}");
             }
 
@@ -460,7 +460,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating photo {PhotoId}", id);
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while updating the photo");
         }
     }
@@ -486,14 +486,14 @@ public class PhotosController : ControllerBase
                 var errors = ModelState
                     .SelectMany(x => x.Value?.Errors?.Select(e => e.ErrorMessage) ?? [])
                     .ToList();
-                
+
                 return BadRequest($"Validation failed: {string.Join(", ", errors)}");
             }
 
             var userId = GetCurrentUserId();
             var photos = await _photoService.ReorderPhotosAsync(userId, reorderDto);
 
-            _logger.LogInformation("Photos reordered for user {UserId}: {PhotoCount} photos", 
+            _logger.LogInformation("Photos reordered for user {UserId}: {PhotoCount} photos",
                 userId, reorderDto.Photos.Count);
 
             return Ok(photos);
@@ -501,7 +501,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error reordering photos for user");
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while reordering photos");
         }
     }
@@ -537,7 +537,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting primary photo {PhotoId}", id);
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while setting the primary photo");
         }
     }
@@ -573,7 +573,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting photo {PhotoId}", id);
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while deleting the photo");
         }
     }
@@ -595,8 +595,9 @@ public class PhotosController : ControllerBase
             var userId = GetCurrentUserId();
             var canUpload = await _photoService.CanUserUploadMorePhotosAsync(userId);
 
-            return Ok(new { 
-                canUpload, 
+            return Ok(new
+            {
+                canUpload,
                 maxPhotos = Models.PhotoConstants.MaxPhotosPerUser,
                 message = canUpload ? "User can upload more photos" : "User has reached photo limit"
             });
@@ -604,7 +605,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking upload availability");
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while checking upload availability");
         }
     }
@@ -655,7 +656,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving photos for moderation");
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while retrieving photos for moderation");
         }
     }
@@ -692,7 +693,7 @@ public class PhotosController : ControllerBase
                 return NotFound($"Photo with ID {id} not found");
             }
 
-            _logger.LogInformation("Photo {PhotoId} moderation status updated to {Status} by moderator", 
+            _logger.LogInformation("Photo {PhotoId} moderation status updated to {Status} by moderator",
                 id, request.Status);
 
             return Ok(new { message = "Moderation status updated successfully" });
@@ -700,7 +701,7 @@ public class PhotosController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating moderation status for photo {PhotoId}", id);
-            return StatusCode(StatusCodes.Status500InternalServerError, 
+            return StatusCode(StatusCodes.Status500InternalServerError,
                 "An error occurred while updating moderation status");
         }
     }
@@ -739,7 +740,7 @@ public class PhotosController : ControllerBase
         var hashCode = userIdClaim.GetHashCode();
         // Ensure positive number
         var mappedUserId = Math.Abs(hashCode);
-        
+
         _logger.LogInformation($"Mapped string user ID '{userIdClaim}' to integer {mappedUserId}");
         return mappedUserId;
     }
@@ -766,7 +767,7 @@ public class PhotosController : ControllerBase
         try
         {
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Privacy photo upload requested by user {UserId} with privacy level {PrivacyLevel}", 
+            _logger.LogInformation("Privacy photo upload requested by user {UserId} with privacy level {PrivacyLevel}",
                 userId, uploadDto.PrivacyLevel);
 
             if (!ModelState.IsValid)
@@ -775,13 +776,13 @@ public class PhotosController : ControllerBase
             }
 
             // Validate privacy level
-            var validPrivacyLevels = new[] { 
-                "PUBLIC", 
-                "PRIVATE", 
-                "MATCH_ONLY", 
-                "VIP" 
+            var validPrivacyLevels = new[] {
+                "PUBLIC",
+                "PRIVATE",
+                "MATCH_ONLY",
+                "VIP"
             };
-            
+
             if (!validPrivacyLevels.Contains(uploadDto.PrivacyLevel))
             {
                 return BadRequest($"Invalid privacy level. Valid values: {string.Join(", ", validPrivacyLevels)}");
@@ -791,7 +792,7 @@ public class PhotosController : ControllerBase
 
             if (result.Success)
             {
-                _logger.LogInformation("Privacy photo uploaded successfully: {PhotoId} for user {UserId}", 
+                _logger.LogInformation("Privacy photo uploaded successfully: {PhotoId} for user {UserId}",
                     result.PhotoId, userId);
                 return CreatedAtAction(nameof(GetPhoto), new { id = result.PhotoId }, result);
             }
@@ -872,7 +873,7 @@ public class PhotosController : ControllerBase
         {
             var currentUserId = GetCurrentUserId();
             var targetUserId = requestingUserId ?? currentUserId.ToString();
-            
+
             _logger.LogInformation("Privacy-controlled image request for photo {PhotoId} by user {UserId}", id, currentUserId);
 
             // TODO: In a real implementation, you'd check match status from a matches service
@@ -895,7 +896,7 @@ public class PhotosController : ControllerBase
                 }
             }
 
-            _logger.LogInformation("Serving {ImageType} version of photo {PhotoId} to user {UserId}", 
+            _logger.LogInformation("Serving {ImageType} version of photo {PhotoId} to user {UserId}",
                 result.IsBlurred ? "blurred" : "original", id, currentUserId);
 
             return File(result.ImageData, result.ContentType, result.FileName);
@@ -962,7 +963,7 @@ public class PhotosController : ControllerBase
         try
         {
             var userId = GetCurrentUserId();
-            _logger.LogInformation("Blur regeneration requested for photo {PhotoId} by user {UserId} with intensity {BlurIntensity}", 
+            _logger.LogInformation("Blur regeneration requested for photo {PhotoId} by user {UserId} with intensity {BlurIntensity}",
                 id, userId, blurIntensity);
 
             if (blurIntensity < 0.0 || blurIntensity > 1.0)

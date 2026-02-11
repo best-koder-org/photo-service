@@ -22,10 +22,10 @@ public class SafetyServiceClient : ISafetyServiceClient
         {
             // Safety service uses authenticated requests - would need to pass through the JWT token
             var response = await _httpClient.GetAsync($"/api/safety/is-blocked/{targetUserId}");
-            
+
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to check block status for target {TargetUserId}: {StatusCode}", 
+                _logger.LogWarning("Failed to check block status for target {TargetUserId}: {StatusCode}",
                     targetUserId, response.StatusCode);
                 return false; // Fail open - allow photo access if safety service is down
             }

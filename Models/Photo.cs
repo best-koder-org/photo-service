@@ -207,8 +207,8 @@ public class Photo
     /// Returns original URL if no blurring is required
     /// </summary>
     [NotMapped]
-    public string BlurredUrl => RequiresMatch && !string.IsNullOrEmpty(BlurredFileName) 
-        ? $"/api/photos/{Id}/blurred" 
+    public string BlurredUrl => RequiresMatch && !string.IsNullOrEmpty(BlurredFileName)
+        ? $"/api/photos/{Id}/blurred"
         : Url;
 
     /// <summary>
@@ -242,7 +242,7 @@ public class Photo
     public T? GetMetadata<T>() where T : class
     {
         if (Metadata == null) return null;
-        
+
         try
         {
             return JsonSerializer.Deserialize<T>(Metadata.RootElement.GetRawText());
@@ -279,7 +279,7 @@ public class Photo
     public T? GetModerationResults<T>() where T : class
     {
         if (ModerationResults == null) return null;
-        
+
         try
         {
             return JsonSerializer.Deserialize<T>(ModerationResults.RootElement.GetRawText());
@@ -448,10 +448,10 @@ public static class PhotoConstants
     public const int MaxPhotosPerUser = 6;
 
     public static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
-    public static readonly string[] AllowedMimeTypes = 
+    public static readonly string[] AllowedMimeTypes =
     {
         "image/jpeg",
-        "image/jpg", 
+        "image/jpg",
         "image/png",
         "image/webp"
     };
@@ -460,10 +460,10 @@ public static class PhotoConstants
     {
         public const int ThumbnailWidth = 150;
         public const int ThumbnailHeight = 150;
-        
+
         public const int MediumWidth = 400;
         public const int MediumHeight = 400;
-        
+
         public const int LargeWidth = 800;
         public const int LargeHeight = 800;
     }

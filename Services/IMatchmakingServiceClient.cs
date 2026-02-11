@@ -21,20 +21,20 @@ public class MatchmakingServiceClient : IMatchmakingServiceClient
         try
         {
             _logger.LogDebug("Checking match status between {UserId1} and {UserId2}", userId1, userId2);
-            
+
             // Call matchmaking service to check if users are matched
             // GET /api/matchmaking/matches/{userId} returns all matches for a user
             var response = await _httpClient.GetAsync($"/api/matchmaking/matches/{userId1}");
-            
+
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Failed to check match status for user {UserId1}: {StatusCode}", 
+                _logger.LogWarning("Failed to check match status for user {UserId1}: {StatusCode}",
                     userId1, response.StatusCode);
                 return false; // Fail secure - require match if service is down
             }
 
             var result = await response.Content.ReadFromJsonAsync<MatchesResponse>();
-            
+
             if (result?.Matches == null)
             {
                 return false;
@@ -42,15 +42,15 @@ public class MatchmakingServiceClient : IMatchmakingServiceClient
 
             // Check if userId2 is in the matched users list
             var isMatched = result.Matches.Any(m => m.MatchedUserId.ToString() == userId2);
-            
-            _logger.LogDebug("Match check result: {IsMatched} for users {UserId1} and {UserId2}", 
+
+            _logger.LogDebug("Match check result: {IsMatched} for users {UserId1} and {UserId2}",
                 isMatched, userId1, userId2);
-            
+
             return isMatched;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking match status between {UserId1} and {UserId2}", 
+            _logger.LogError(ex, "Error checking match status between {UserId1} and {UserId2}",
                 userId1, userId2);
             return false; // Fail secure - require match on error
         }

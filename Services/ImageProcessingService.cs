@@ -29,7 +29,7 @@ public class ImageProcessingService : IImageProcessingService
         _logger = logger;
         _mlContext = new MLContext(seed: 1);
         _uploadsPath = configuration["Storage:UploadsPath"] ?? "wwwroot/uploads";
-        
+
         // Ensure directories exist for privacy features
         Directory.CreateDirectory(Path.Combine(_uploadsPath, "photos"));
         Directory.CreateDirectory(Path.Combine(_uploadsPath, "blurred"));
@@ -49,7 +49,7 @@ public class ImageProcessingService : IImageProcessingService
             _logger.LogInformation("Starting image processing for file: {FileName}", originalFileName);
 
             using var image = await Image.LoadAsync(inputStream);
-            
+
             // Store original dimensions
             result.OriginalWidth = image.Width;
             result.OriginalHeight = image.Height;
@@ -60,7 +60,7 @@ public class ImageProcessingService : IImageProcessingService
             // ================================
 
             var (processedWidth, processedHeight, wasResized) = CalculateOptimalDimensions(image.Width, image.Height);
-            
+
             result.WasResized = wasResized;
             result.Width = processedWidth;
             result.Height = processedHeight;
@@ -161,7 +161,7 @@ public class ImageProcessingService : IImageProcessingService
         try
         {
             using var image = await Image.LoadAsync(inputStream);
-            
+
             image.Mutate(x => x.Resize(new ResizeOptions
             {
                 Size = new Size(width, height),
@@ -193,7 +193,7 @@ public class ImageProcessingService : IImageProcessingService
         try
         {
             using var image = await Image.LoadAsync(inputStream);
-            
+
             image.Mutate(x => x.Resize(new ResizeOptions
             {
                 Size = new Size(width, height),
@@ -247,7 +247,7 @@ public class ImageProcessingService : IImageProcessingService
 
             // Try to load and analyze the image
             using var image = await Image.LoadAsync(stream);
-            
+
             result.Format = image.Metadata.DecodedImageFormat?.Name ?? "Unknown";
             result.Width = image.Width;
             result.Height = image.Height;
@@ -367,7 +367,7 @@ public class ImageProcessingService : IImageProcessingService
             // Ensure score is within valid range
             score = Math.Max(1, Math.Min(100, score));
 
-            _logger.LogDebug("Calculated quality score: {Score} for image {Width}x{Height}", 
+            _logger.LogDebug("Calculated quality score: {Score} for image {Width}x{Height}",
                 score, image.Width, image.Height);
 
             return score;
@@ -424,9 +424,9 @@ public class ImageProcessingService : IImageProcessingService
             // Save the blurred image
             await image.SaveAsync(blurredFilePath);
 
-            _logger.LogInformation("Generated blurred image: {BlurredFileName} (intensity: {BlurIntensity})", 
+            _logger.LogInformation("Generated blurred image: {BlurredFileName} (intensity: {BlurIntensity})",
                 blurredFileName, blurIntensity);
-            
+
             return blurredFileName;
         }
         catch (Exception ex)
@@ -443,12 +443,12 @@ public class ImageProcessingService : IImageProcessingService
     public async Task<ModerationAnalysis> AnalyzeContentSafetyAsync(byte[] imageData, string fileName)
     {
         var analysis = new ModerationAnalysis();
-        
+
         try
         {
             using var imageStream = new MemoryStream(imageData);
             using var image = await Image.LoadAsync(imageStream);
-            
+
             // Perform multiple types of analysis
             var qualityAnalysis = await PerformImageQualityAnalysisAsync(image);
             var contentAnalysis = await PerformContentAnalysisAsync(image, fileName);
@@ -457,7 +457,7 @@ public class ImageProcessingService : IImageProcessingService
             // Combine analysis results
             analysis.SafetyScore = CalculateOverallSafetyScore(qualityAnalysis, contentAnalysis, technicalAnalysis);
             analysis.IsAppropriate = analysis.SafetyScore >= 0.7; // Conservative threshold
-            
+
             // Compile classifications
             analysis.Classifications = new Dictionary<string, double>
             {
@@ -473,10 +473,10 @@ public class ImageProcessingService : IImageProcessingService
             if (technicalAnalysis.TechnicalScore < 0.6) issues.Add("Technical issues detected");
             if (contentAnalysis.Appropriateness < 0.7) issues.Add("Content review recommended");
             if (analysis.SafetyScore < 0.7) issues.Add("Manual moderation required");
-            
+
             analysis.DetectedIssues = issues.ToArray();
 
-            _logger.LogInformation("Content analysis completed for {FileName}. Safety Score: {SafetyScore}, Issues: {IssueCount}", 
+            _logger.LogInformation("Content analysis completed for {FileName}. Safety Score: {SafetyScore}, Issues: {IssueCount}",
                 fileName, analysis.SafetyScore, issues.Count);
 
             return analysis;
@@ -484,13 +484,13 @@ public class ImageProcessingService : IImageProcessingService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error analyzing content safety for {FileName}", fileName);
-            
+
             // Return conservative analysis on error
             analysis.IsAppropriate = false;
             analysis.SafetyScore = 0.0;
             analysis.DetectedIssues = new[] { "Analysis failed - manual review required" };
             analysis.Classifications = new Dictionary<string, double> { ["analysis_error"] = 1.0 };
-            
+
             return analysis;
         }
     }
@@ -500,8 +500,8 @@ public class ImageProcessingService : IImageProcessingService
     /// Complete processing pipeline for dating app privacy requirements
     /// </summary>
     public async Task<PrivacyPhotoProcessingResult> ProcessPhotoWithPrivacyAsync(
-        byte[] originalImageData, 
-        string originalFileName, 
+        byte[] originalImageData,
+        string originalFileName,
         string privacyLevel,
         double blurIntensity = 0.8)
     {
@@ -510,7 +510,7 @@ public class ImageProcessingService : IImageProcessingService
 
         try
         {
-            _logger.LogInformation("Starting privacy photo processing for {FileName} with privacy level {PrivacyLevel}", 
+            _logger.LogInformation("Starting privacy photo processing for {FileName} with privacy level {PrivacyLevel}",
                 originalFileName, privacyLevel);
 
             // Perform standard image processing first
@@ -521,8 +521,8 @@ public class ImageProcessingService : IImageProcessingService
             result.StandardProcessingResult = standardResult;
 
             // Generate blurred version if privacy requires it
-            if (privacyLevel == PhotoPrivacyLevel.Private || 
-                privacyLevel == PhotoPrivacyLevel.MatchOnly || 
+            if (privacyLevel == PhotoPrivacyLevel.Private ||
+                privacyLevel == PhotoPrivacyLevel.MatchOnly ||
                 privacyLevel == PhotoPrivacyLevel.VIP)
             {
                 result.BlurredFileName = await GenerateBlurredImageAsync(
@@ -544,7 +544,7 @@ public class ImageProcessingService : IImageProcessingService
             result.ProcessingTimeMs = (int)stopwatch.ElapsedMilliseconds;
             result.IsSuccess = true;
 
-            _logger.LogInformation("Privacy photo processing completed in {ProcessingTime}ms for {FileName}", 
+            _logger.LogInformation("Privacy photo processing completed in {ProcessingTime}ms for {FileName}",
                 result.ProcessingTimeMs, originalFileName);
 
             return result;
@@ -552,12 +552,12 @@ public class ImageProcessingService : IImageProcessingService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in privacy photo processing for {FileName}", originalFileName);
-            
+
             result.IsSuccess = false;
             result.ErrorMessage = ex.Message;
             stopwatch.Stop();
             result.ProcessingTimeMs = (int)stopwatch.ElapsedMilliseconds;
-            
+
             return result;
         }
     }
@@ -567,8 +567,8 @@ public class ImageProcessingService : IImageProcessingService
     /// Controls what version of the image should be served to different users
     /// </summary>
     public async Task<byte[]?> GetImageWithPrivacyControlAsync(
-        Photo photo, 
-        string requestingUserId, 
+        Photo photo,
+        string requestingUserId,
         bool hasMatch = false)
     {
         try
@@ -630,7 +630,7 @@ public class ImageProcessingService : IImageProcessingService
         const int maxPixels = 1_000_000; // 1MP max for reasonable file sizes
 
         // If image is already optimal size, no resize needed
-        if (originalWidth <= maxDimension && originalHeight <= maxDimension && 
+        if (originalWidth <= maxDimension && originalHeight <= maxDimension &&
             originalWidth * originalHeight <= maxPixels)
         {
             return (originalWidth, originalHeight, false);
@@ -671,7 +671,7 @@ public class ImageProcessingService : IImageProcessingService
     private static string DetermineOptimalFormat(string originalFileName)
     {
         var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
-        
+
         return extension switch
         {
             ".png" => "PNG", // Keep PNG for images with transparency
@@ -761,9 +761,9 @@ public class ImageProcessingService : IImageProcessingService
             {
                 // Simplified sharpness analysis based on image characteristics
                 // For performance, we'll use image dimensions and compression as proxies
-                
+
                 int sharpnessScore = 10; // Base score
-                
+
                 // Factor in image resolution
                 int totalPixels = image.Width * image.Height;
                 if (totalPixels > 500000) // > 0.5MP
@@ -772,12 +772,12 @@ public class ImageProcessingService : IImageProcessingService
                     sharpnessScore += 3;
                 if (totalPixels > 2000000) // > 2MP
                     sharpnessScore += 2;
-                
+
                 // Factor in aspect ratio (square images tend to be better for profiles)
                 double aspectRatio = (double)image.Width / image.Height;
                 if (aspectRatio >= 0.8 && aspectRatio <= 1.25) // Near square
                     sharpnessScore += 2;
-                
+
                 return Math.Min(20, Math.Max(0, sharpnessScore));
             }
             catch
@@ -796,11 +796,11 @@ public class ImageProcessingService : IImageProcessingService
         return await Task.Run(() =>
         {
             var analysis = new ImageQualityAnalysis();
-            
+
             // Resolution quality
             var totalPixels = image.Width * image.Height;
             analysis.ResolutionScore = Math.Min(1.0, totalPixels / 1000000.0); // Normalize to 1MP
-            
+
             // Aspect ratio appropriateness for dating profiles
             var aspectRatio = (double)image.Width / image.Height;
             analysis.AspectRatioScore = aspectRatio switch
@@ -813,7 +813,7 @@ public class ImageProcessingService : IImageProcessingService
 
             // Overall quality score
             analysis.Quality = (analysis.ResolutionScore + analysis.AspectRatioScore) / 2.0;
-            
+
             return analysis;
         });
     }
@@ -823,15 +823,15 @@ public class ImageProcessingService : IImageProcessingService
         return await Task.Run(() =>
         {
             var analysis = new ContentAnalysis();
-            
+
             // Heuristic-based content analysis
             // In production, this would integrate with specialized ML models
-            
+
             // File name analysis for potential inappropriate content
             var fileNameLower = fileName.ToLowerInvariant();
             var inappropriateKeywords = new[] { "nude", "naked", "explicit", "nsfw", "adult" };
             var hasInappropriateName = inappropriateKeywords.Any(keyword => fileNameLower.Contains(keyword));
-            
+
             if (hasInappropriateName)
             {
                 analysis.Appropriateness = 0.3;
@@ -845,7 +845,7 @@ public class ImageProcessingService : IImageProcessingService
             // Simple brightness analysis (very bright or very dark images can be problematic)
             // This is a placeholder - real implementation would analyze pixel data
             analysis.TechnicalQuality = 0.8;
-            
+
             return analysis;
         });
     }
@@ -855,7 +855,7 @@ public class ImageProcessingService : IImageProcessingService
         return await Task.Run(() =>
         {
             var analysis = new TechnicalAnalysis();
-            
+
             // Technical quality metrics
             var format = image.Metadata.DecodedImageFormat?.Name?.ToLower() ?? "unknown";
             analysis.FormatScore = format switch
@@ -876,14 +876,14 @@ public class ImageProcessingService : IImageProcessingService
             };
 
             analysis.TechnicalScore = (analysis.FormatScore + analysis.SizeScore) / 2.0;
-            
+
             return analysis;
         });
     }
 
     private double CalculateOverallSafetyScore(
-        ImageQualityAnalysis quality, 
-        ContentAnalysis content, 
+        ImageQualityAnalysis quality,
+        ContentAnalysis content,
         TechnicalAnalysis technical)
     {
         // Weighted combination of different analysis types
@@ -913,7 +913,7 @@ public class ImageProcessingService : IImageProcessingService
     private async Task<byte[]?> GetImageDataAsync(string fileName)
     {
         if (string.IsNullOrEmpty(fileName)) return null;
-        
+
         var filePath = Path.Combine(_uploadsPath, "photos", fileName);
         return File.Exists(filePath) ? await File.ReadAllBytesAsync(filePath) : null;
     }
@@ -921,7 +921,7 @@ public class ImageProcessingService : IImageProcessingService
     private async Task<byte[]?> GetBlurredImageDataAsync(string? blurredFileName)
     {
         if (string.IsNullOrEmpty(blurredFileName)) return null;
-        
+
         var filePath = Path.Combine(_uploadsPath, "blurred", blurredFileName);
         return File.Exists(filePath) ? await File.ReadAllBytesAsync(filePath) : null;
     }

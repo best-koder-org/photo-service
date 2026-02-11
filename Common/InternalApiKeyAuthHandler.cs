@@ -17,7 +17,7 @@ public class InternalApiKeyAuthHandler : DelegatingHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var apiKey = _configuration["InternalAuth:ApiKey"];
-        
+
         if (!string.IsNullOrEmpty(apiKey))
         {
             request.Headers.Add("X-Internal-API-Key", apiKey);
