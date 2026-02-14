@@ -64,7 +64,7 @@
             Standard REST conventions with comprehensive error handling
             </summary>
         </member>
-        <member name="M:PhotoService.Controllers.PhotosController.#ctor(PhotoService.Services.IPhotoService,Microsoft.Extensions.Logging.ILogger{PhotoService.Controllers.PhotosController},PhotoService.Services.ISafetyServiceClient,PhotoService.Services.IMatchmakingServiceClient,PhotoService.Data.PhotoContext)">
+        <member name="M:PhotoService.Controllers.PhotosController.#ctor(PhotoService.Services.IPhotoService,Microsoft.Extensions.Logging.ILogger{PhotoService.Controllers.PhotosController},PhotoService.Services.ISafetyServiceClient,PhotoService.Services.IMatchmakingServiceClient,PhotoService.Data.PhotoContext,PhotoService.Metrics.PhotoServiceMetrics)">
             <summary>
             Constructor with dependency injection
             Standard controller pattern with service layer integration

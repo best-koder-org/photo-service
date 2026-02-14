@@ -199,11 +199,9 @@ builder.Services.AddOpenTelemetry()
         }));
 
 // Create custom meters for business metrics
-System.Diagnostics.Metrics.Meter customMeter = new("PhotoService");
-var photosUploadedCounter = customMeter.CreateCounter<long>("photos_uploaded_total", description: "Total number of photos uploaded");
-var photosDeletedCounter = customMeter.CreateCounter<long>("photos_deleted_total", description: "Total number of photos deleted");
-var photoProcessingDuration = customMeter.CreateHistogram<double>("photo_processing_duration_ms", description: "Duration of photo processing in milliseconds");
-var photoModerationScore = customMeter.CreateHistogram<double>("photo_moderation_score", description: "Distribution of photo moderation safety scores");
+
+// Register injectable business metrics
+builder.Services.AddSingleton<PhotoService.Metrics.PhotoServiceMetrics>();
 
 var app = builder.Build();
 

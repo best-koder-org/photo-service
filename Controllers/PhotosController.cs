@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PhotoService.Data;
 using PhotoService.DTOs;
 using PhotoService.Services;
+using PhotoService.Metrics;
 using PhotoService.Models;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
@@ -25,6 +26,7 @@ public class PhotosController : ControllerBase
     private readonly ISafetyServiceClient _safetyService;
     private readonly IMatchmakingServiceClient _matchmakingService;
     private readonly PhotoContext _context;
+    private readonly PhotoServiceMetrics? _metrics;
 
     /// <summary>
     /// Constructor with dependency injection
@@ -35,13 +37,15 @@ public class PhotosController : ControllerBase
         ILogger<PhotosController> logger,
         ISafetyServiceClient safetyService,
         IMatchmakingServiceClient matchmakingService,
-        PhotoContext context)
+        PhotoContext context,
+        PhotoServiceMetrics? metrics = null)
     {
         _photoService = photoService;
         _logger = logger;
         _safetyService = safetyService;
         _matchmakingService = matchmakingService;
         _context = context;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -113,6 +117,7 @@ public class PhotosController : ControllerBase
             // Return 201 Created with photo details
             // ================================
 
+                        _metrics?.PhotoUploaded();
             return CreatedAtAction(
                 nameof(GetPhoto),
                 new { id = result.Photo!.Id },
@@ -568,6 +573,7 @@ public class PhotosController : ControllerBase
 
             _logger.LogInformation("Photo {PhotoId} deleted by user {UserId}", id, userId);
 
+            _metrics?.PhotoDeleted();
             return Ok(new { message = "Photo deleted successfully" });
         }
         catch (Exception ex)
