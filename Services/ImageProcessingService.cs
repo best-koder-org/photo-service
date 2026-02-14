@@ -624,7 +624,7 @@ public class ImageProcessingService : IImageProcessingService
     /// Calculate optimal dimensions for image processing
     /// Balances quality and file size while maintaining aspect ratio
     /// </summary>
-    private static (int width, int height, bool wasResized) CalculateOptimalDimensions(int originalWidth, int originalHeight)
+    internal static (int width, int height, bool wasResized) CalculateOptimalDimensions(int originalWidth, int originalHeight)
     {
         const int maxDimension = PhotoConstants.ImageSizes.LargeWidth; // 800px max
         const int maxPixels = 1_000_000; // 1MP max for reasonable file sizes
@@ -668,7 +668,7 @@ public class ImageProcessingService : IImageProcessingService
     /// Determine optimal output format based on input file
     /// Prioritizes modern formats with good compression
     /// </summary>
-    private static string DetermineOptimalFormat(string originalFileName)
+    internal static string DetermineOptimalFormat(string originalFileName)
     {
         var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
 
@@ -683,7 +683,7 @@ public class ImageProcessingService : IImageProcessingService
     /// <summary>
     /// Get file extension for a given format
     /// </summary>
-    private static string GetExtensionForFormat(string format)
+    internal static string GetExtensionForFormat(string format)
     {
         return format.ToUpper() switch
         {
@@ -738,7 +738,7 @@ public class ImageProcessingService : IImageProcessingService
     /// Get expected image formats for a file extension
     /// Used for validation and format verification
     /// </summary>
-    private static string[] GetExpectedFormatsForExtension(string extension)
+    internal static string[] GetExpectedFormatsForExtension(string extension)
     {
         return extension.ToLowerInvariant() switch
         {
@@ -881,7 +881,7 @@ public class ImageProcessingService : IImageProcessingService
         });
     }
 
-    private double CalculateOverallSafetyScore(
+    internal double CalculateOverallSafetyScore(
         ImageQualityAnalysis quality,
         ContentAnalysis content,
         TechnicalAnalysis technical)
