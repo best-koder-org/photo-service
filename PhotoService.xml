@@ -306,6 +306,43 @@
             Get current verification status for the authenticated user.
             </summary>
         </member>
+        <member name="T:PhotoService.Controllers.VoicePromptsController">
+            <summary>
+            Voice Prompts API — upload, retrieve, and delete audio voice prompts.
+            One prompt per user. In-app recording only (no file import = anti-deepfake).
+            Stored as AAC (.m4a), validated server-side for duration and size.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VoicePromptsController.Upload(Microsoft.AspNetCore.Http.IFormFile)">
+            <summary>
+            Upload a voice prompt (replaces existing if any).
+            POST /api/voice-prompts
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VoicePromptsController.GetAudio">
+            <summary>
+            Get the current user's voice prompt audio.
+            GET /api/voice-prompts/audio
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VoicePromptsController.GetAudioForUser(System.Int32)">
+            <summary>
+            Get another user's voice prompt audio (for Discover screen).
+            GET /api/voice-prompts/audio/{userId}
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VoicePromptsController.GetMeta(System.Int32)">
+            <summary>
+            Get voice prompt metadata for a user (no audio data).
+            GET /api/voice-prompts/meta/{userId}
+            </summary>
+        </member>
+        <member name="M:PhotoService.Controllers.VoicePromptsController.Delete">
+            <summary>
+            Delete the current user's voice prompt.
+            DELETE /api/voice-prompts
+            </summary>
+        </member>
         <member name="T:PhotoService.Data.PhotoContext">
             <summary>
             MySQL-optimized Entity Framework context for photo management
@@ -1194,6 +1231,45 @@
             <summary>
             Tracks face verification attempts for self-hosted DeepFace badge system.
             </summary>
+        </member>
+        <member name="T:PhotoService.Models.VoicePrompt">
+            <summary>
+            Voice prompt entity — one prompt per user, stored as AAC audio.
+            Follows the same moderation pattern as Photo entity.
+            </summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.UserId">
+            <summary>User profile ID (from UserService)</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.StoredFileName">
+            <summary>Stored filename: {userId}_{timestamp}_{guid}.m4a</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.FileSizeBytes">
+            <summary>File size in bytes</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.DurationSeconds">
+            <summary>Duration in seconds (server-validated)</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.MimeType">
+            <summary>MIME type — always audio/mp4 for AAC</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.ModerationStatus">
+            <summary>Content moderation status</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.TranscriptText">
+            <summary>Speech-to-text transcript for moderation review</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.ContentHash">
+            <summary>SHA-256 content hash for duplicate detection</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.FilePath">
+            <summary>Calculated file path for storage</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePrompt.Url">
+            <summary>Public URL for audio access</summary>
+        </member>
+        <member name="T:PhotoService.Models.VoicePromptConstants">
+            <summary>Voice prompt constants</summary>
         </member>
         <member name="T:PhotoService.Services.IFaceVerificationService">
             <summary>

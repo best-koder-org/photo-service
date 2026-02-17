@@ -19,6 +19,7 @@ public class PhotoContext : DbContext
     public DbSet<Photo> Photos { get; set; }
     public DbSet<PhotoProcessingJob> PhotoProcessingJobs { get; set; }
     public DbSet<PhotoModerationLog> PhotoModerationLogs { get; set; }
+    public DbSet<VoicePrompt> VoicePrompts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +29,7 @@ public class PhotoContext : DbContext
         ConfigurePhotoEntity(modelBuilder);
         ConfigurePhotoProcessingJobEntity(modelBuilder);
         ConfigurePhotoModerationLogEntity(modelBuilder);
+        ConfigureVoicePromptEntity(modelBuilder);
     }
 
     // Shared JSON converter for JsonDocument properties
@@ -337,6 +339,73 @@ public class PhotoContext : DbContext
         return base.SaveChanges();
     }
 
+
+    private void ConfigureVoicePromptEntity(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<VoicePrompt>();
+
+        entity.ToTable("voice_prompts");
+
+        entity.HasKey(v => v.Id);
+        entity.Property(v => v.Id).HasColumnName("id");
+
+        entity.Property(v => v.UserId).HasColumnName("user_id").IsRequired();
+
+        entity.Property(v => v.StoredFileName)
+            .HasColumnName("stored_file_name").HasMaxLength(255).IsRequired();
+
+        entity.Property(v => v.FileSizeBytes)
+            .HasColumnName("file_size_bytes").IsRequired();
+
+        entity.Property(v => v.DurationSeconds)
+            .HasColumnName("duration_seconds").IsRequired();
+
+        entity.Property(v => v.MimeType)
+            .HasColumnName("mime_type").HasMaxLength(50).IsRequired();
+
+        entity.Property(v => v.ModerationStatus)
+            .HasColumnName("moderation_status").HasMaxLength(20)
+            .HasDefaultValue("AUTO_APPROVED").IsRequired();
+
+        entity.Property(v => v.TranscriptText)
+            .HasColumnName("transcript_text").HasMaxLength(2000);
+
+        entity.Property(v => v.ContentHash)
+            .HasColumnName("content_hash").HasMaxLength(64);
+
+        entity.Property(v => v.CreatedAt)
+            .HasColumnName("created_at")
+            .HasColumnType("timestamp with time zone")
+            .HasDefaultValueSql("CURRENT_TIMESTAMP").IsRequired();
+
+        entity.Property(v => v.UpdatedAt)
+            .HasColumnName("updated_at")
+            .HasColumnType("timestamp with time zone");
+
+        entity.Property(v => v.IsDeleted)
+            .HasColumnName("is_deleted").HasDefaultValue(false).IsRequired();
+
+        entity.Property(v => v.DeletedAt)
+            .HasColumnName("deleted_at")
+            .HasColumnType("timestamp with time zone");
+
+        // One voice prompt per user (unique index)
+        entity.HasIndex(v => new { v.UserId, v.IsDeleted })
+            .HasDatabaseName("ix_voice_prompts_user_active")
+            .IsUnique()
+            .HasFilter("is_deleted = false");
+
+        entity.HasIndex(v => v.ModerationStatus)
+            .HasDatabaseName("ix_voice_prompts_moderation_status");
+
+        // Constraints
+        entity.HasCheckConstraint("ck_voice_prompts_duration_range",
+            "duration_seconds >= 3 AND duration_seconds <= 30");
+        entity.HasCheckConstraint("ck_voice_prompts_file_size_positive",
+            "file_size_bytes > 0");
+    }
+
+
     /// <summary>
     /// Override SaveChangesAsync to handle automatic timestamp updates
     /// </summary>
@@ -363,6 +432,23 @@ public class PhotoContext : DbContext
 
                 case EntityState.Deleted:
                     // Convert hard delete to soft delete
+                    entry.State = EntityState.Modified;
+                    entry.Entity.IsDeleted = true;
+                    entry.Entity.DeletedAt = DateTime.UtcNow;
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    break;
+            }
+        }
+
+        // VoicePrompt timestamps
+        foreach (var entry in ChangeTracker.Entries<VoicePrompt>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Modified:
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    break;
+                case EntityState.Deleted:
                     entry.State = EntityState.Modified;
                     entry.Entity.IsDeleted = true;
                     entry.Entity.DeletedAt = DateTime.UtcNow;
