@@ -124,6 +124,22 @@ builder.Services.AddScoped<IStorageService, LocalStorageService>();
 // Background Services - Periodic cleanup and maintenance
 builder.Services.AddHostedService<PhotoCleanupBackgroundService>();
 
+// Face Verification - DeepFace integration (DX-2: T155/T156)
+builder.Services.AddDbContext<VerificationDbContext>(options =>
+    options.UseMySql(connectionString, serverVersion, mySqlOptions =>
+    {
+        mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorNumbersToAdd: null);
+    }));
+builder.Services.AddScoped<IFaceVerificationService, FaceVerificationService>();
+builder.Services.AddHttpClient("DeepFace", client =>
+{
+    client.BaseAddress = new Uri("http://deepface:5000");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 // Add MediatR for CQRS
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
@@ -265,8 +281,10 @@ if (app.Environment.IsDevelopment())
     using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<PhotoContext>();
+        var verificationContext = scope.ServiceProvider.GetRequiredService<VerificationDbContext>();
         // Ensure database is created and migrated
         context.Database.EnsureCreated();
+        verificationContext.Database.EnsureCreated();
     }
 }
 
