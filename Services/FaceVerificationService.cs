@@ -25,8 +25,14 @@ public class FaceVerificationService : IFaceVerificationService
     private readonly ILogger<FaceVerificationService> _logger;
     private const string DeepFaceUrl = "http://deepface:5005";
     private const int MaxAttemptsPerDay = 3;
-    private const double VerifiedThreshold = 0.40;
-    private const double PendingThreshold = 0.30;
+
+    // Facenet512 cosine distance threshold is 0.30 (from DeepFace source).
+    // similarity = 1.0 - distance, so:
+    //   distance ≤ 0.30 → similarity ≥ 0.70 → same person (verified)
+    //   distance ≤ 0.40 → similarity ≥ 0.60 → borderline (pending manual review)
+    //   distance > 0.40 → similarity < 0.60 → different person (rejected)
+    private const double VerifiedThreshold = 0.70;
+    private const double PendingThreshold = 0.60;
 
     public FaceVerificationService(
         IHttpClientFactory httpClientFactory,
@@ -42,7 +48,7 @@ public class FaceVerificationService : IFaceVerificationService
 
     public async Task<VerificationResult> VerifyAsync(int userId, Stream selfieStream, string selfieFileName)
     {
-        // Rate limit check
+        // Rate limit check — only count actual Rejected attempts, not errors or pending reviews
         int todayCount = await GetAttemptCountTodayAsync(userId);
         if (todayCount >= MaxAttemptsPerDay)
         {
@@ -89,6 +95,7 @@ public class FaceVerificationService : IFaceVerificationService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("DeepFace returned {StatusCode}", response.StatusCode);
+                // Errors do NOT count against daily attempts
                 return new VerificationResult(
                     VerificationDecision.Error,
                     0,
@@ -119,6 +126,7 @@ public class FaceVerificationService : IFaceVerificationService
                 attempt.Result = "Pending";
                 attempt.Decision = VerificationDecision.PendingReview;
                 attempt.RejectionReason = "Borderline similarity — queued for manual review";
+                // Pending does NOT count against daily attempts (not the user's fault)
             }
             else
             {
@@ -139,6 +147,7 @@ public class FaceVerificationService : IFaceVerificationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "DeepFace verification failed for user {UserId}", userId);
+            // Exceptions do NOT count against daily attempts
             return new VerificationResult(
                 VerificationDecision.Error,
                 0,
@@ -155,11 +164,16 @@ public class FaceVerificationService : IFaceVerificationService
             .FirstOrDefaultAsync();
     }
 
+    /// <summary>
+    /// Count only Rejected attempts today — errors and pending reviews don't burn daily slots.
+    /// </summary>
     public async Task<int> GetAttemptCountTodayAsync(int userId)
     {
         var today = DateTime.UtcNow.Date;
         return await _verificationDb.VerificationAttempts
-            .CountAsync(a => a.UserId == userId && a.CreatedAt >= today);
+            .CountAsync(a => a.UserId == userId
+                && a.CreatedAt >= today
+                && a.Result == "Rejected");
     }
 }
 
