@@ -306,16 +306,11 @@
             Get current verification status for the authenticated user.
             </summary>
         </member>
-        <member name="T:PhotoService.Controllers.VoicePromptsController">
-            <summary>
-            Voice Prompts API — upload, retrieve, and delete audio voice prompts.
-            One prompt per user. In-app recording only (no file import = anti-deepfake).
-            Stored as AAC (.m4a), validated server-side for duration and size.
-            </summary>
-        </member>
+        <!-- Badly formed XML comment ignored for member "T:PhotoService.Controllers.VoicePromptsController" -->
         <member name="M:PhotoService.Controllers.VoicePromptsController.Upload(Microsoft.AspNetCore.Http.IFormFile)">
             <summary>
             Upload a voice prompt (replaces existing if any).
+            Goes live immediately as AUTO_APPROVED; background moderation follows.
             POST /api/voice-prompts
             </summary>
         </member>
@@ -328,6 +323,7 @@
         <member name="M:PhotoService.Controllers.VoicePromptsController.GetAudioForUser(System.Int32)">
             <summary>
             Get another user's voice prompt audio (for Discover screen).
+            Rejected prompts are automatically filtered out.
             GET /api/voice-prompts/audio/{userId}
             </summary>
         </member>
@@ -342,6 +338,18 @@
             Delete the current user's voice prompt.
             DELETE /api/voice-prompts
             </summary>
+        </member>
+        <!-- Badly formed XML comment ignored for member "M:PhotoService.Controllers.VoicePromptsController.Report(System.Int32,PhotoService.Controllers.VoicePromptReportRequest)" -->
+        <member name="T:PhotoService.Controllers.VoicePromptReportRequest">
+            <summary>
+            Request body for voice prompt report endpoint.
+            </summary>
+        </member>
+        <member name="P:PhotoService.Controllers.VoicePromptReportRequest.Reason">
+            <summary>Reason: inappropriate, harassment, spam, hate_speech, other</summary>
+        </member>
+        <member name="P:PhotoService.Controllers.VoicePromptReportRequest.Description">
+            <summary>Optional detailed description</summary>
         </member>
         <member name="T:PhotoService.Data.PhotoContext">
             <summary>
@@ -1271,6 +1279,25 @@
         <member name="T:PhotoService.Models.VoicePromptConstants">
             <summary>Voice prompt constants</summary>
         </member>
+        <!-- Badly formed XML comment ignored for member "T:PhotoService.Models.VoicePromptReport" -->
+        <member name="P:PhotoService.Models.VoicePromptReport.VoicePromptId">
+            <summary>Voice prompt being reported</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePromptReport.ReporterUserId">
+            <summary>User who filed the report</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePromptReport.TargetUserId">
+            <summary>User who owns the reported voice prompt</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePromptReport.Reason">
+            <summary>Reason category: inappropriate, harassment, spam, other</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePromptReport.Description">
+            <summary>Optional free-text description</summary>
+        </member>
+        <member name="P:PhotoService.Models.VoicePromptReport.Status">
+            <summary>Report status: pending, reviewed, dismissed</summary>
+        </member>
         <member name="T:PhotoService.Services.IFaceVerificationService">
             <summary>
             Face verification service using self-hosted DeepFace container.
@@ -1840,6 +1867,26 @@
             Error message if storage failed
             </summary>
         </member>
+        <member name="T:PhotoService.Services.IVoicePromptModerationService">
+            <summary>
+            Interface for voice prompt audio moderation.
+            Transcribes audio via Whisper.net and scans text for policy violations.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Services.IVoicePromptModerationService.ModerateAsync(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Moderate a voice prompt audio file.
+            Transcribes to text, checks for forbidden content, and updates the entity.
+            </summary>
+            <param name="voicePromptId">Voice prompt entity ID</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>Moderation result</returns>
+        </member>
+        <member name="T:PhotoService.Services.VoicePromptModerationResult">
+            <summary>
+            Result from voice prompt moderation pipeline.
+            </summary>
+        </member>
         <member name="T:PhotoService.Services.LocalStorageService">
             <summary>
             Local File Storage Service implementation
@@ -2059,6 +2106,227 @@
             Upload photo with advanced privacy settings
             Enhanced upload with privacy level, blur settings, and content moderation
             </summary>
+        </member>
+        <member name="T:PhotoService.Services.VoicePromptModerationBackgroundService">
+             <summary>
+             Background service that polls for AUTO_APPROVED voice prompts
+             and runs them through the moderation pipeline.
+            
+             Flow:
+               Upload → entity created with status=AUTO_APPROVED → served immediately
+               This service picks it up → transcribe → moderate → APPROVED or REJECTED
+               If REJECTED, ServeAudioForUser() already filters it out (existing query).
+            
+             Polling interval is configurable; defaults to every 30 seconds.
+             In production, consider replacing with a message queue (RabbitMQ/Redis Streams).
+             </summary>
+        </member>
+        <member name="T:PhotoService.Services.VoicePromptModerationService">
+             <summary>
+             Voice prompt moderation pipeline:
+               1. Convert audio to 16kHz PCM WAV (Whisper requires this)
+               2. Transcribe with Whisper.net (local, no API costs)
+               3. Scan transcript for policy violations (hate speech, contact info, etc.)
+               4. Update entity with transcript + moderation status
+            
+             Runs async — voice prompt is already live (AUTO_APPROVED) while moderation
+             processes in background. If content is bad, status moves to REJECTED and
+             the existing ServeAudioForUser() query filters it out automatically.
+             </summary>
+        </member>
+        <member name="M:PhotoService.Services.VoicePromptModerationService.ConvertToWavAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Convert m4a/aac to 16kHz mono WAV using ffmpeg (available in Docker image).
+            Falls back to original file if ffmpeg is not found (will fail in Whisper but logged).
+            </summary>
+        </member>
+        <member name="M:PhotoService.Services.VoicePromptModerationService.CheckForViolations(System.String)">
+            <summary>
+            Check transcript for policy violations.
+            Categories: hate speech, slurs, contact information, sexual content.
+            </summary>
+        </member>
+        <member name="M:PhotoService.Services.VoicePromptModerationService.PhonePattern">
+            <remarks>
+            Pattern:<br/>
+            <code>(\\+?\\d[\\d\\s\\-\\.]{6,}\\d)</code><br/>
+            Options:<br/>
+            <code>RegexOptions.Compiled</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ 1st capture group.<br/>
+                ○ Match '+' atomically, optionally.<br/>
+                ○ Match a Unicode digit.<br/>
+                ○ Match a character in the set [-.\d\s] greedily at least 6 times.<br/>
+                ○ Match a Unicode digit.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="M:PhotoService.Services.VoicePromptModerationService.EmailPattern">
+            <remarks>
+            Pattern:<br/>
+            <code>[\\w.+-]+@[\\w-]+\\.[\\w.]+</code><br/>
+            Options:<br/>
+            <code>RegexOptions.Compiled</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ Match a character in the set [+-.\w] atomically at least once.<br/>
+            ○ Match '@'.<br/>
+            ○ Match a character in the set [-\w] atomically at least once.<br/>
+            ○ Match '.'.<br/>
+            ○ Match a character in the set [.\w] atomically at least once.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="M:PhotoService.Services.VoicePromptModerationService.SocialMediaPattern">
+            <remarks>
+            Pattern:<br/>
+            <code>(instagram|snapchat|snap|insta|tiktok|twitter|whatsapp|telegram|@\\w{3,})</code><br/>
+            Options:<br/>
+            <code>RegexOptions.Compiled</code><br/>
+            Explanation:<br/>
+            <code>
+            ○ 1st capture group.<br/>
+                ○ Match with 5 alternative expressions, atomically.<br/>
+                    ○ Match a sequence of expressions.<br/>
+                        ○ Match the string "insta".<br/>
+                        ○ Match with 2 alternative expressions, atomically.<br/>
+                            ○ Match the string "gram".<br/>
+                            ○ Match an empty string.<br/>
+                    ○ Match a sequence of expressions.<br/>
+                        ○ Match the string "snap".<br/>
+                        ○ Match with 2 alternative expressions, atomically.<br/>
+                            ○ Match the string "chat".<br/>
+                            ○ Match an empty string.<br/>
+                    ○ Match a sequence of expressions.<br/>
+                        ○ Match 't'.<br/>
+                        ○ Match with 3 alternative expressions, atomically.<br/>
+                            ○ Match the string "iktok".<br/>
+                            ○ Match the string "witter".<br/>
+                            ○ Match the string "elegram".<br/>
+                    ○ Match the string "whatsapp".<br/>
+                    ○ Match a sequence of expressions.<br/>
+                        ○ Match '@'.<br/>
+                        ○ Match a word character atomically at least 3 times.<br/>
+            </code>
+            </remarks>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.PhonePattern_0">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the PhonePattern method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.PhonePattern_0.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.PhonePattern_0.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.PhonePattern_0.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.PhonePattern_0.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.PhonePattern_0.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.PhonePattern_0.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.PhonePattern_0.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.PhonePattern_0.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.EmailPattern_1">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the EmailPattern method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.EmailPattern_1.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.EmailPattern_1.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.EmailPattern_1.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.EmailPattern_1.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.EmailPattern_1.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.EmailPattern_1.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.EmailPattern_1.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.EmailPattern_1.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.SocialMediaPattern_2">
+            <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the SocialMediaPattern method.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.Instance">
+            <summary>Cached, thread-safe singleton instance.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.#ctor">
+            <summary>Initializes the instance.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.RunnerFactory">
+            <summary>Provides a factory for creating <see cref="T:System.Text.RegularExpressions.RegexRunner"/> instances to be used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.RunnerFactory.CreateInstance">
+            <summary>Creates an instance of a <see cref="T:System.Text.RegularExpressions.RegexRunner"/> used by methods on <see cref="T:System.Text.RegularExpressions.Regex"/>.</summary>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.RunnerFactory.Runner">
+            <summary>Provides the runner that contains the custom logic implementing the specified regular expression.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.RunnerFactory.Runner.Scan(System.ReadOnlySpan{System.Char})">
+            <summary>Scan the <paramref name="inputSpan"/> starting from base.runtextstart for the next match.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.RunnerFactory.Runner.TryFindNextPossibleStartingPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Search <paramref name="inputSpan"/> starting from base.runtextpos for the next location a match could possibly start.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if a possible match was found; false if no more matches are possible.</returns>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.SocialMediaPattern_2.RunnerFactory.Runner.TryMatchAtCurrentPosition(System.ReadOnlySpan{System.Char})">
+            <summary>Determine whether <paramref name="inputSpan"/> at base.runtextpos is a match for the regular expression.</summary>
+            <param name="inputSpan">The text being scanned by the regular expression.</param>
+            <returns>true if the regular expression matches at the current position; otherwise, false.</returns>
+        </member>
+        <member name="T:System.Text.RegularExpressions.Generated.Utilities">
+            <summary>Helper methods used by generated <see cref="T:System.Text.RegularExpressions.Regex"/>-derived implementations.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout">
+            <summary>Default timeout value set in <see cref="T:System.AppContext"/>, or <see cref="F:System.Text.RegularExpressions.Regex.InfiniteMatchTimeout"/> if none was set.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_hasTimeout">
+            <summary>Whether <see cref="F:System.Text.RegularExpressions.Generated.Utilities.s_defaultTimeout"/> is non-infinite.</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.Utilities.IndexOfNonAsciiOrAny_64342F0DE2BD516AEDD95511856041A933B1595930BFAA07E851BEA87588EEEF(System.ReadOnlySpan{System.Char})">
+            <summary>Finds the next index of any character that matches a character in the set [+\d].</summary>
+        </member>
+        <member name="M:System.Text.RegularExpressions.Generated.Utilities.IsWordChar(System.Char)">
+            <summary>Determines whether the character is part of the [\w] set.</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_ascii_100000000029800">
+            <summary>Supports searching for characters in or not in "@istw".</summary>
+        </member>
+        <member name="F:System.Text.RegularExpressions.Generated.Utilities.s_ascii_FFFFFFFFFFF700FCFFFFFFFFFFFFFFFF">
+            <summary>Supports searching for characters in or not in "\0\u0001\u0002\u0003\u0004\u0005\u0006\a\b\t\n\v\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&amp;'()*,-./:;&lt;=&gt;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f".</summary>
         </member>
     </members>
 </doc>

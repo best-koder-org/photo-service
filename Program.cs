@@ -124,6 +124,10 @@ builder.Services.AddScoped<IStorageService, LocalStorageService>();
 // Background Services - Periodic cleanup and maintenance
 builder.Services.AddHostedService<PhotoCleanupBackgroundService>();
 
+// Voice Prompt Moderation — async Whisper.net transcription + text scanning
+builder.Services.AddScoped<IVoicePromptModerationService, VoicePromptModerationService>();
+builder.Services.AddHostedService<VoicePromptModerationBackgroundService>();
+
 // Face Verification - DeepFace integration (DX-2: T155/T156)
 builder.Services.AddDbContext<VerificationDbContext>(options =>
     options.UseMySql(connectionString, serverVersion, mySqlOptions =>

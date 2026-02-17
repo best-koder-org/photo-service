@@ -20,6 +20,7 @@ public class PhotoContext : DbContext
     public DbSet<PhotoProcessingJob> PhotoProcessingJobs { get; set; }
     public DbSet<PhotoModerationLog> PhotoModerationLogs { get; set; }
     public DbSet<VoicePrompt> VoicePrompts { get; set; }
+    public DbSet<VoicePromptReport> VoicePromptReports { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,7 @@ public class PhotoContext : DbContext
         ConfigurePhotoProcessingJobEntity(modelBuilder);
         ConfigurePhotoModerationLogEntity(modelBuilder);
         ConfigureVoicePromptEntity(modelBuilder);
+        ConfigureVoicePromptReportEntity(modelBuilder);
     }
 
     // Shared JSON converter for JsonDocument properties
@@ -456,5 +458,28 @@ public class PhotoContext : DbContext
                     break;
             }
         }
+    }
+
+    private void ConfigureVoicePromptReportEntity(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<VoicePromptReport>(entity =>
+        {
+            entity.ToTable("voice_prompt_reports");
+
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.VoicePromptId).HasColumnName("voice_prompt_id").IsRequired();
+            entity.Property(e => e.ReporterUserId).HasColumnName("reporter_user_id").IsRequired();
+            entity.Property(e => e.TargetUserId).HasColumnName("target_user_id").IsRequired();
+            entity.Property(e => e.Reason).HasColumnName("reason").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(500);
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(20).HasDefaultValue("pending");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.ReviewedAt).HasColumnName("reviewed_at");
+
+            // One report per user per voice prompt
+            entity.HasIndex(e => new { e.VoicePromptId, e.ReporterUserId }).IsUnique();
+            entity.HasIndex(e => e.Status);
+        });
     }
 }

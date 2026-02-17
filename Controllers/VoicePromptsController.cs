@@ -9,9 +9,17 @@ using System.Security.Cryptography;
 namespace PhotoService.Controllers;
 
 /// <summary>
-/// Voice Prompts API — upload, retrieve, and delete audio voice prompts.
+/// Voice Prompts API — upload, retrieve, delete, and report audio voice prompts.
 /// One prompt per user. In-app recording only (no file import = anti-deepfake).
 /// Stored as AAC (.m4a), validated server-side for duration and size.
+///
+/// Moderation flow:
+///   Upload → AUTO_APPROVED (served immediately) →
+///   Background service transcribes via Whisper.net →
+///   Text checked for policy violations →
+///   APPROVED or REJECTED (rejected prompts filtered from queries automatically).
+///
+/// Users can also report voice prompts → PENDING_REVIEW for trust & safety.
 /// </summary>
 [ApiController]
 [Route("api/voice-prompts")]
@@ -29,11 +37,12 @@ public class VoicePromptsController : ControllerBase
 
     /// <summary>
     /// Upload a voice prompt (replaces existing if any).
+    /// Goes live immediately as AUTO_APPROVED; background moderation follows.
     /// POST /api/voice-prompts
     /// </summary>
     [HttpPost]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(3 * 1024 * 1024)] // 3 MB hard limit (2 MB soft, headroom for encoding)
+    [RequestSizeLimit(3 * 1024 * 1024)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Upload(IFormFile audio)
@@ -84,10 +93,9 @@ public class VoicePromptsController : ControllerBase
                 _logger.LogInformation("Soft-deleted previous voice prompt {Id} for user {UserId}", existing.Id, userId);
             }
 
-            // ── Create entity ──
-            // Duration is client-reported via form field; server re-validates range.
+            // ── Parse duration ──
             var durationStr = Request.Form["duration"].FirstOrDefault();
-            double duration = 15; // default estimate
+            double duration = 15;
             if (double.TryParse(durationStr, System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out var parsed))
             {
@@ -97,6 +105,7 @@ public class VoicePromptsController : ControllerBase
             if (duration < VoicePromptConstants.MinDurationSeconds || duration > VoicePromptConstants.MaxDurationSeconds)
                 return BadRequest($"Duration must be between {VoicePromptConstants.MinDurationSeconds} and {VoicePromptConstants.MaxDurationSeconds} seconds");
 
+            // ── Create entity (AUTO_APPROVED — served immediately) ──
             var voicePrompt = new VoicePrompt
             {
                 UserId = userId,
@@ -112,7 +121,8 @@ public class VoicePromptsController : ControllerBase
             _context.VoicePrompts.Add(voicePrompt);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Voice prompt {Id} uploaded for user {UserId} ({Size}B, {Duration}s)",
+            _logger.LogInformation(
+                "Voice prompt {Id} uploaded for user {UserId} ({Size}B, {Duration}s) — queued for async moderation",
                 voicePrompt.Id, userId, audio.Length, duration);
 
             var url = $"/api/voice-prompts/audio";
@@ -146,6 +156,7 @@ public class VoicePromptsController : ControllerBase
 
     /// <summary>
     /// Get another user's voice prompt audio (for Discover screen).
+    /// Rejected prompts are automatically filtered out.
     /// GET /api/voice-prompts/audio/{userId}
     /// </summary>
     [HttpGet("audio/{targetUserId:int}")]
@@ -153,7 +164,6 @@ public class VoicePromptsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAudioForUser(int targetUserId)
     {
-        // Any authenticated user can listen to voice prompts (they're on public profiles)
         return await ServeAudioForUser(targetUserId);
     }
 
@@ -207,6 +217,77 @@ public class VoicePromptsController : ControllerBase
         return Ok(new { message = "Voice prompt deleted" });
     }
 
+    /// <summary>
+    /// Report a user's voice prompt for policy violations.
+    /// Sets moderation status to PENDING_REVIEW so trust & safety can investigate.
+    /// POST /api/voice-prompts/report/{targetUserId}
+    /// </summary>
+    [HttpPost("report/{targetUserId:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Report(int targetUserId, [FromBody] VoicePromptReportRequest request)
+    {
+        try
+        {
+            var reporterUserId = GetCurrentUserId();
+
+            if (reporterUserId == targetUserId)
+                return BadRequest("Cannot report your own voice prompt");
+
+            var allowedReasons = new[] { "inappropriate", "harassment", "spam", "hate_speech", "other" };
+            if (!allowedReasons.Contains(request.Reason?.ToLower()))
+                return BadRequest($"Reason must be one of: {string.Join(", ", allowedReasons)}");
+
+            var vp = await _context.VoicePrompts
+                .Where(v => v.UserId == targetUserId && !v.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            if (vp == null) return NotFound("No voice prompt found for this user");
+
+            // Check for duplicate report
+            var existingReport = await _context.VoicePromptReports
+                .AnyAsync(r => r.VoicePromptId == vp.Id && r.ReporterUserId == reporterUserId);
+
+            if (existingReport) return Conflict("You have already reported this voice prompt");
+
+            // Create report
+            var report = new VoicePromptReport
+            {
+                VoicePromptId = vp.Id,
+                ReporterUserId = reporterUserId,
+                TargetUserId = targetUserId,
+                Reason = request.Reason!.ToLower(),
+                Description = request.Description?.Length > 500
+                    ? request.Description[..500]
+                    : request.Description,
+                CreatedAt = DateTime.UtcNow,
+            };
+
+            _context.VoicePromptReports.Add(report);
+
+            // Escalate to PENDING_REVIEW so trust & safety sees it
+            if (vp.ModerationStatus != Models.ModerationStatus.Rejected)
+            {
+                vp.ModerationStatus = Models.ModerationStatus.PendingReview;
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogWarning(
+                "Voice prompt {VpId} reported by user {ReporterId} against user {TargetId}: {Reason}",
+                vp.Id, reporterUserId, targetUserId, request.Reason);
+
+            return Ok(new { message = "Report submitted. Thank you for helping keep our community safe." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reporting voice prompt");
+            return StatusCode(500, "An error occurred while submitting the report");
+        }
+    }
+
     // ────────────── Helpers ──────────────
 
     private async Task<IActionResult> ServeAudioForUser(int userId)
@@ -243,4 +324,16 @@ public class VoicePromptsController : ControllerBase
 
         return Math.Abs(userIdClaim.GetHashCode());
     }
+}
+
+/// <summary>
+/// Request body for voice prompt report endpoint.
+/// </summary>
+public class VoicePromptReportRequest
+{
+    /// <summary>Reason: inappropriate, harassment, spam, hate_speech, other</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>Optional detailed description</summary>
+    public string? Description { get; set; }
 }
