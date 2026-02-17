@@ -247,8 +247,6 @@ app.UseCorrelationIds();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Static file serving for uploaded photos
-app.UseStaticFiles();
 
 // ImageSharp middleware for image processing
 app.UseImageSharp();
