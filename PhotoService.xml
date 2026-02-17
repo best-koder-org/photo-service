@@ -1201,6 +1201,11 @@
             Compares selfie against profile photo using Facenet512 model.
             </summary>
         </member>
+        <member name="M:PhotoService.Services.FaceVerificationService.GetAttemptCountTodayAsync(System.Int32)">
+            <summary>
+            Count only Rejected attempts today — errors and pending reviews don't burn daily slots.
+            </summary>
+        </member>
         <member name="T:PhotoService.Services.ImageProcessingService">
             <summary>
             Image Processing Service implementation using ImageSharp
