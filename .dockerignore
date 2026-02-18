@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/logs/
+**/uploads/
+models/
+*.md
+*.http
+*.sln
+.git/
+.vs/
+.vscode/
+PhotoService.Tests/

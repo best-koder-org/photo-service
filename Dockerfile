@@ -28,6 +28,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 # Security and optimization settings
 # ================================
 
+# Install ffmpeg for Whisper.net audio conversion (m4a → WAV)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user for security
 RUN groupadd -r photoservice && useradd -r -g photoservice photoservice
 
@@ -38,10 +41,14 @@ WORKDIR /app
 RUN mkdir -p /app/wwwroot/uploads/photos && \
     chown -R photoservice:photoservice /app
 
+# Create directories for voice prompt uploads and Whisper model cache
+RUN mkdir -p /app/uploads/voice-prompts /app/models && \
+    chown -R photoservice:photoservice /app/uploads /app/models
+
 # Copy published application
 COPY --from=publish /app/publish .
 
-# Set ownership for application files
+# Set ownership for application files (including voice-prompts + models dirs)
 RUN chown -R photoservice:photoservice /app
 
 # ================================
