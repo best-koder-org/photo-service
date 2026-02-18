@@ -105,13 +105,11 @@ public class PhotoContext : DbContext
         // Timestamps - PostgreSQL-optimized
         photoEntity.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .HasDefaultValueSql("CURRENT_TIMESTAMP")
             .IsRequired();
 
         photoEntity.Property(p => p.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnName("updated_at");
 
         // Soft delete
         photoEntity.Property(p => p.IsDeleted)
@@ -120,8 +118,7 @@ public class PhotoContext : DbContext
             .IsRequired();
 
         photoEntity.Property(p => p.DeletedAt)
-            .HasColumnName("deleted_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnName("deleted_at");
 
         // Moderation
         photoEntity.Property(p => p.ModerationStatus)
@@ -244,17 +241,14 @@ public class PhotoContext : DbContext
 
         jobEntity.Property(j => j.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .HasDefaultValueSql("CURRENT_TIMESTAMP")
             .IsRequired();
 
         jobEntity.Property(j => j.StartedAt)
-            .HasColumnName("started_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnName("started_at");
 
         jobEntity.Property(j => j.CompletedAt)
-            .HasColumnName("completed_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnName("completed_at");
 
         // Foreign key relationship
         jobEntity.HasOne<Photo>()
@@ -310,7 +304,6 @@ public class PhotoContext : DbContext
 
         logEntity.Property(l => l.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .HasDefaultValueSql("CURRENT_TIMESTAMP")
             .IsRequired();
 
@@ -377,19 +370,16 @@ public class PhotoContext : DbContext
 
         entity.Property(v => v.CreatedAt)
             .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
             .HasDefaultValueSql("CURRENT_TIMESTAMP").IsRequired();
 
         entity.Property(v => v.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnName("updated_at");
 
         entity.Property(v => v.IsDeleted)
             .HasColumnName("is_deleted").HasDefaultValue(false).IsRequired();
 
         entity.Property(v => v.DeletedAt)
-            .HasColumnName("deleted_at")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnName("deleted_at");
 
         // One voice prompt per user (unique index)
         entity.HasIndex(v => new { v.UserId, v.IsDeleted })

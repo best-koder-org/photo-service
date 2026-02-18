@@ -41,10 +41,10 @@ namespace PhotoService.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     BlurIntensity = table.Column<double>(type: "double", nullable: false),
                     RequiresMatch = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     is_deleted = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
-                    deleted_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: true),
+                    deleted_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     moderation_status = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false, defaultValue: "AUTO_APPROVED")
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     SafetyScore = table.Column<double>(type: "double", nullable: true),
@@ -87,7 +87,7 @@ namespace PhotoService.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     notes = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
                 },
                 constraints: table =>
                 {
@@ -118,9 +118,9 @@ namespace PhotoService.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     error_message = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
-                    started_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: true),
-                    completed_at = table.Column<DateTime>(type: "timestamp with time zone(6)", nullable: true)
+                    created_at = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    started_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    completed_at = table.Column<DateTime>(type: "datetime(6)", nullable: true)
                 },
                 constraints: table =>
                 {

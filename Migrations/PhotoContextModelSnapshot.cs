@@ -177,17 +177,11 @@ namespace PhotoService.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_photos_user_id");
 
-                    b.HasIndex("ModerationStatus", "IsDeleted", "CreatedAt")
-                        .HasDatabaseName("ix_photos_moderation_queue");
-
                     b.HasIndex("UserId", "IsDeleted", "DisplayOrder")
                         .HasDatabaseName("ix_photos_user_active_display_order");
 
                     b.HasIndex("UserId", "IsPrimary", "IsDeleted")
                         .HasDatabaseName("ix_photos_user_primary_active");
-
-                    b.HasIndex("UserId", "IsDeleted", "IsPrimary", "DisplayOrder")
-                        .HasDatabaseName("ix_photos_user_ordering");
 
                     b.ToTable("photos", null, t =>
                         {
@@ -325,153 +319,6 @@ namespace PhotoService.Migrations
                         .HasDatabaseName("ix_photo_processing_jobs_status");
 
                     b.ToTable("photo_processing_jobs", (string)null);
-                });
-
-            modelBuilder.Entity("PhotoService.Models.VoicePrompt", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ContentHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .HasColumnName("content_hash");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<double>("DurationSeconds")
-                        .HasColumnType("double")
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<long>("FileSizeBytes")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size_bytes");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
-
-                    b.Property<string>("MimeType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("mime_type");
-
-                    b.Property<string>("ModerationStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasDefaultValue("AUTO_APPROVED")
-                        .HasColumnName("moderation_status");
-
-                    b.Property<string>("StoredFileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
-                        .HasColumnName("stored_file_name");
-
-                    b.Property<string>("TranscriptText")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)")
-                        .HasColumnName("transcript_text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ModerationStatus")
-                        .HasDatabaseName("ix_voice_prompts_moderation_status");
-
-                    b.HasIndex("UserId", "IsDeleted")
-                        .IsUnique()
-                        .HasDatabaseName("ix_voice_prompts_user_active")
-                        .HasFilter("is_deleted = false");
-
-                    b.ToTable("voice_prompts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_voice_prompts_duration_range", "duration_seconds >= 3 AND duration_seconds <= 30");
-
-                            t.HasCheckConstraint("ck_voice_prompts_file_size_positive", "file_size_bytes > 0");
-                        });
-                });
-
-            modelBuilder.Entity("PhotoService.Models.VoicePromptReport", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("reason");
-
-                    b.Property<int>("ReporterUserId")
-                        .HasColumnType("int")
-                        .HasColumnName("reporter_user_id");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime(6)")
-                        .HasColumnName("reviewed_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasDefaultValue("pending")
-                        .HasColumnName("status");
-
-                    b.Property<int>("TargetUserId")
-                        .HasColumnType("int")
-                        .HasColumnName("target_user_id");
-
-                    b.Property<int>("VoicePromptId")
-                        .HasColumnType("int")
-                        .HasColumnName("voice_prompt_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("VoicePromptId", "ReporterUserId")
-                        .IsUnique();
-
-                    b.ToTable("voice_prompt_reports", (string)null);
                 });
 
             modelBuilder.Entity("PhotoService.Models.PhotoModerationLog", b =>
