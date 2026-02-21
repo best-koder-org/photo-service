@@ -582,7 +582,7 @@ public class PhotoService : IPhotoService
     private async Task UnsetAllPrimaryPhotosAsync(int userId)
     {
         var primaryPhotos = await _context.Photos
-            .AsNoTracking()
+            
             .Where(p => p.UserId == userId && p.IsPrimary && !p.IsDeleted)
             .ToListAsync();
 
@@ -590,7 +590,9 @@ public class PhotoService : IPhotoService
         {
             photo.IsPrimary = false;
             photo.UpdatedAt = DateTime.UtcNow;
+            _context.Photos.Update(photo);
         }
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>

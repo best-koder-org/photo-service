@@ -978,18 +978,6 @@
         <member name="M:PhotoService.Migrations.InitialMySQLSchema.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
             <inheritdoc />
         </member>
-        <member name="T:PhotoService.Migrations.AddVoicePromptsAndFixTimestamps">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.AddVoicePromptsAndFixTimestamps.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.AddVoicePromptsAndFixTimestamps.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
-            <inheritdoc />
-        </member>
-        <member name="M:PhotoService.Migrations.AddVoicePromptsAndFixTimestamps.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
-            <inheritdoc />
-        </member>
         <member name="T:PhotoService.Models.Photo">
             <summary>
             Photo entity designed specifically for PostgreSQL with modern dating app features
