@@ -409,6 +409,15 @@
             </summary>
         </member>
         <!-- Badly formed XML comment ignored for member "M:PhotoService.Controllers.VoicePromptsController.Report(System.Int32,PhotoService.Controllers.VoicePromptReportRequest)" -->
+        <member name="M:PhotoService.Controllers.VoicePromptsController.TryGetCurrentUserIdAsync">
+            <summary>
+            Resolve the current caller's int profile id.
+            1) A numeric claim is returned as-is (tests + legacy numeric-id tokens).
+            2) Otherwise resolve the Keycloak UUID to the UserService ProfileId via
+               <see cref="T:PhotoService.Services.IProfileIdResolver"/> (forwarding the caller's bearer token).
+            Returns null when identity cannot be established (callers fail closed with 401).
+            </summary>
+        </member>
         <member name="T:PhotoService.Controllers.VoicePromptReportRequest">
             <summary>
             Request body for voice prompt report endpoint.
@@ -2272,6 +2281,25 @@
             Upload photo with advanced privacy settings
             Enhanced upload with privacy level, blur settings, and content moderation
             </summary>
+        </member>
+        <member name="T:PhotoService.Services.IProfileIdResolver">
+             <summary>
+             Resolves the caller's int profile id (UserService ProfileId) from their
+             bearer token. photo-service historically keyed per-user resources by a
+             per-process hash of the Keycloak UUID claim, which is neither the int
+             ProfileId the rest of the system uses nor stable across restarts.
+            
+             This resolver forwards the caller's Authorization header to UserService
+             GET /api/profiles/me (which maps the Keycloak "sub" to the int ProfileId)
+             and returns that id. Null is returned when the caller cannot be resolved
+             (e.g. UserService unreachable) so callers can fail closed.
+             </summary>
+        </member>
+        <member name="M:PhotoService.Services.IProfileIdResolver.ResolveProfileIdAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Resolve the bearer caller to their int UserService ProfileId.</summary>
+        </member>
+        <member name="T:PhotoService.Services.ProfileIdResolver">
+            <summary>Default <see cref="T:PhotoService.Services.IProfileIdResolver"/> backed by UserService.</summary>
         </member>
         <member name="T:PhotoService.Services.VoicePromptModerationBackgroundService">
              <summary>

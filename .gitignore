@@ -85,3 +85,9 @@ secrets.json
 
 ## User uploads (never commit to git)
 wwwroot/uploads/
+
+## Downloaded ML model weights (never commit)
+/models/*.bin
+
+## Runtime uploads (never commit)
+/uploads/
